@@ -1,26 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { Pool, type PoolClient } from "pg";
+import { Pool } from "pg";
 import { inject } from "vitest";
-
-export type Db = PoolClient;
 
 export function createPool() {
   return new Pool({ connectionString: inject("dbUrl"), max: 4 });
 }
 
-type Role = "authenticated" | "anon" | "service_role";
-
-async function asRole<T>(pool: Pool, role: Role, sub: string | null, fn: (db: Db) => Promise<T>) {
+/** Calls a function as the `anon` role, like the app does with the publishable key. */
+export async function anon<T = unknown>(pool: Pool, sql: string, params: unknown[] = []): Promise<T> {
   const db = await pool.connect();
   try {
     await db.query("begin");
-    await db.query(`set local role ${role}`);
-    await db.query("select set_config('request.jwt.claims', $1, true)", [
-      JSON.stringify(sub ? { sub, role } : { role }),
-    ]);
-    const result = await fn(db);
+    await db.query("set local role anon");
+    const { rows } = await db.query(sql, params);
     await db.query("commit");
-    return result;
+    return rows[0]?.r as T;
   } catch (error) {
     await db.query("rollback");
     throw error;
@@ -29,94 +23,65 @@ async function asRole<T>(pool: Pool, role: Role, sub: string | null, fn: (db: Db
   }
 }
 
-/** Runs `fn` in a transaction as a signed-in user, with RLS applied. */
-export const asUser = <T>(pool: Pool, userId: string, fn: (db: Db) => Promise<T>) =>
-  asRole(pool, "authenticated", userId, fn);
+export interface Setup {
+  workspaceId: string;
+  pageId: string;
+  key: string;
+  slug: string;
+  password: string;
+  token: string;
+}
 
-export const asAnon = <T>(pool: Pool, fn: (db: Db) => Promise<T>) => asRole(pool, "anon", null, fn);
-
-/** The server-side service role used by the ingestion API. */
-export const asService = <T>(pool: Pool, fn: (db: Db) => Promise<T>) =>
-  asRole(pool, "service_role", null, fn);
-
-export async function createUser(pool: Pool, label = "user") {
-  const email = `${label}-${randomUUID()}@example.com`;
-  const { rows } = await pool.query<{ id: string }>(
-    "insert into auth.users (email, raw_user_meta_data) values ($1, $2) returning id",
-    [email, JSON.stringify({ full_name: label })],
+export async function setupWorkspace(pool: Pool, name = "Dra Letícia"): Promise<Setup> {
+  const slug = `ws-${randomUUID().slice(0, 8)}`;
+  const password = `senha-${randomUUID().slice(0, 8)}`;
+  const { rows } = await pool.query(
+    "select lh_private.create_workspace($1, $2, $3, 'LP principal') as r",
+    [name, slug, password],
   );
-  return rows[0].id;
+  const { workspace_id, page_id, public_key } = rows[0].r;
+  const login = await anon<{ token: string }>(pool, "select lh_login($1, $2) as r", [slug, password]);
+  return { workspaceId: workspace_id, pageId: page_id, key: public_key, slug, password, token: login.token };
 }
 
-export const uniqueSlug = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;
-
-export async function createWorkspace(pool: Pool, adminId: string, name = "Workspace") {
-  return asUser(pool, adminId, async (db) => {
-    const { rows } = await db.query<{ id: string; slug: string }>(
-      "select id, slug from leadhub.create_workspace($1, $2)",
-      [name, uniqueSlug("ws")],
-    );
-    return rows[0];
-  });
+export interface CollectEvent {
+  type: string;
+  visitor_id: string;
+  url?: string;
+  name?: string;
+  code?: string;
+  channel?: string;
+  device?: string;
+  attribution?: Record<string, string>;
+  data?: Record<string, unknown>;
 }
 
-export async function addMember(pool: Pool, adminId: string, workspaceId: string, userId: string, role: string) {
-  await asUser(pool, adminId, (db) =>
-    db.query("insert into leadhub.workspace_members (workspace_id, user_id, role) values ($1, $2, $3)", [
-      workspaceId,
-      userId,
-      role,
-    ]),
+export const collect = (pool: Pool, key: string, event: CollectEvent, host = "clinica.com.br") =>
+  anon<{ ok: boolean; lead_id?: string; code?: string; new_lead?: boolean }>(
+    pool,
+    "select lh_collect($1, $2, $3) as r",
+    [key, host, JSON.stringify(event)],
   );
+
+export interface LeadRow {
+  id: string;
+  code: string;
+  name: string | null;
+  phone: string | null;
+  status: string;
+  notes: string | null;
+  sale_value: number | null;
+  channel: string | null;
+  utm_campaign: string | null;
+  ad_id: string | null;
+  fbc: string | null;
+  clicks: number;
+  source: string;
 }
 
-export async function createProject(pool: Pool, userId: string, workspaceId: string, name = "Projeto") {
-  return asUser(pool, userId, async (db) => {
-    const { rows } = await db.query<{ id: string }>(
-      "insert into leadhub.projects (workspace_id, name, slug) values ($1, $2, $3) returning id",
-      [workspaceId, name, uniqueSlug("prj")],
-    );
-    return rows[0].id;
-  });
-}
-
-export interface IngestInput {
-  project_id: string;
-  idempotency_key?: string;
-  request_hash?: string;
-  lead: { name?: string; phone?: string; phone_norm?: string; email?: string; email_norm?: string };
-  answers?: Record<string, string>;
-  touch?: Record<string, unknown>;
-  first_touch?: Record<string, unknown>;
-  tracking?: Record<string, unknown>;
-  consent?: Record<string, unknown>;
-  form_id?: string;
-}
-
-export interface IngestResult {
-  lead_id: string;
-  conversion_id: string;
-  created: boolean;
-  duplicate: boolean;
-  replayed: boolean;
-  received_at: string;
-}
-
-export async function ingest(pool: Pool, input: IngestInput) {
-  return asService(pool, async (db) => {
-    const { rows } = await db.query<{ r: IngestResult }>("select leadhub.ingest_lead_conversion($1) as r", [
-      JSON.stringify(input),
-    ]);
-    return rows[0].r;
-  });
-}
-
-export async function stagesOf(pool: Pool, userId: string, projectId: string) {
-  return asUser(pool, userId, async (db) => {
-    const { rows } = await db.query<{ id: string; key: string; kind: string }>(
-      "select id, key, kind from leadhub.pipeline_stages where project_id = $1 order by position",
-      [projectId],
-    );
-    return Object.fromEntries(rows.map((r) => [r.key, r.id])) as Record<string, string>;
-  });
-}
+export const listLeads = (pool: Pool, token: string, filters: { status?: string; search?: string } = {}) =>
+  anon<{ total: number; rows: LeadRow[] }>(pool, "select lh_list_leads($1, null, $2, null, $3) as r", [
+    token,
+    filters.status ?? null,
+    filters.search ?? null,
+  ]);

@@ -1,162 +1,98 @@
 # Lead Hub
 
-Painel de leads e mensuração do anúncio até a venda. Implementação do
-*Blueprint de produto e implementação v1.0* (22/09/2026).
+Planilha de leads da Landing Page: cada clique no botão de WhatsApp vira uma
+linha, com a origem completa do anúncio. O telefone fica para o atendente
+preencher, porque o visitante vai direto para o WhatsApp sem formulário.
 
-Esta primeira entrega cobre a **primeira tarefa** (§20.1) e a **primeira
-demonstração útil** (§20.2) do blueprint:
+## Como funciona
 
-- Base multiempresa: workspaces, membros com papéis, projetos e **RLS** em
-  todas as tabelas, com testes provando que um membro do workspace A não
-  acessa o workspace B (AC11).
-- Schema de leads, conversões, respostas, pipeline configurável, histórico
-  imutável e outbox (§7, §9).
-- API de ingestão `POST /api/v1/leads` com chave pública + Origin ou chave
-  secreta, idempotência, deduplicação por telefone/e-mail e classificação de
-  origem (§6, §8).
-- Painel: login, escolha de workspace, criação de projeto, Landing Pages,
-  formulários, chaves, tabela de leads com filtros, mudança de estágio e
-  página do lead com first/last touch e linha do tempo (§13).
+```
+Landing Page + tracker.js ──► /api/collect ──► lh_collect() ──► planilha
+  UTMs, gclid, fbclid,           (Next.js)      (Supabase)       atendente preenche
+  cookies do pixel da Meta,                                      telefone, status,
+  visitas e cliques no WhatsApp                                  valor e observações
+```
 
-## Stack
-
-| Camada | Tecnologia |
-| --- | --- |
-| Aplicação | Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 |
-| Banco e Auth | Supabase (PostgreSQL 17, Supabase Auth) |
-| Validação | zod, libphonenumber-js |
-| Testes | Vitest; testes de banco contra um PostgreSQL real |
-
-## Ambiente de teste
-
-- App: https://leadinghub.netlify.app (Netlify, projeto `leadinghub`, build do
-  branch `claude/new-session-hmpokh`).
-- Banco: projeto Supabase `rda-report-panel`, esquema `leadhub`.
-- Variáveis no Netlify: `NEXT_PUBLIC_SUPABASE_URL`,
-  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL` e, para a API de
-  ingestão, `SUPABASE_SECRET_KEY`.
-
-## Modo demonstração
-
-Com `LEADHUB_DEMO=1`, o app abre direto no workspace de exemplo (Clínica
-Exen), sem login e sem banco. As páginas usam um cliente em memória
-(`src/lib/demo/`) que responde às mesmas consultas do Supabase. As mudanças de
-cada visitante (estágios, projetos, leads de teste) ficam num cookie e podem
-ser descartadas em **Reiniciar dados**. A API de ingestão responde 503 nesse
-modo. O ambiente de teste no Netlify roda assim.
-
-## Como rodar
-
-1. Crie um projeto no Supabase (ou use `npx supabase start` com Docker).
-2. Aplique as migrações:
-   ```bash
-   npx supabase link --project-ref <ref>
-   npx supabase db push
+1. A LP recebe uma linha de código (em **Instalação na LP** no painel):
+   ```html
+   <script src="https://leadinghub.netlify.app/tracker.js" data-key="pk_..." async></script>
    ```
-3. Copie `.env.example` para `.env.local` e preencha as chaves.
-4. `npm install && npm run dev` e abra http://localhost:3000.
+2. O script guarda as UTMs, os identificadores de clique e os cookies `_fbp` e
+   `_fbc` do pixel da Meta, e envia uma visita ao abrir a página.
+3. Em todo clique num link de WhatsApp (`wa.me`, `api.whatsapp.com`,
+   `whatsapp://` ou `window.open` para eles), envia o clique sem atrasar a
+   abertura do WhatsApp e acrescenta à mensagem um código curto, por exemplo
+   "(cód. 7F3K)".
+4. No painel, a linha aparece em segundos com o mesmo código. Quando a conversa
+   chega, o atendente busca o código e preenche telefone, status, valor e
+   observações direto na célula.
 
-### Roteiro da demo (§20.2)
+Cliques repetidos do mesmo visitante somam na mesma linha e mantêm a origem da
+primeira visita. Contatos que chegaram no WhatsApp sem passar pela LP podem ser
+adicionados à mão (**+ Adicionar lead**). A planilha exporta para CSV no
+formato do Excel em português.
 
-1. Crie uma conta em `/login` e um workspace.
-2. Crie um projeto. O pipeline padrão (Novo → Contatado → Qualificado →
-   Agendado → Venda / Perdido) é criado automaticamente.
-3. Na página do projeto, gere uma **chave secreta** e envie um lead pela API:
-   ```bash
-   curl -X POST http://localhost:3000/api/v1/leads \
-     -H "Authorization: Bearer sk_live_..." \
-     -H "Idempotency-Key: $(uuidgen)" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "lead": { "name": "Joao da Silva", "phone": "(11) 99999-9999", "email": "joao@example.com" },
-       "answers": { "budget_range": "10k_20k", "city": "Sao Paulo" },
-       "tracking": { "utm_source": "facebook", "utm_medium": "paid", "utm_campaign": "transplante_sp", "ad_id": "456789" },
-       "consent": { "privacy_policy": true }
-     }'
-   ```
-   Ou use o botão **Enviar lead de teste**.
-4. Em **Leads**, mude o estágio de Novo para Contatado. A mudança aparece na
-   linha do tempo do lead com autor e horário.
+API do script para LPs que montam o link do WhatsApp no próprio código:
 
-## API de ingestão
+```js
+window.open(LeadHub.whatsappUrl("https://wa.me/55119..."));  // registra o clique e inclui o código
+LeadHub.identify({ name: "Maria" });                          // nome no lead do visitante
+LeadHub.track("quiz_concluido", { etapa: 3 });                // qualquer outro evento
+```
 
-`POST /api/v1/leads` (contrato do §8). Respostas sempre trazem `X-Request-Id`.
+## Acesso
 
-| Modo | Cabeçalhos |
-| --- | --- |
-| Landing Page (navegador) | `X-Project-Key: pk_live_…` e `Origin` de um domínio autorizado da LP |
-| Servidor | `Authorization: Bearer sk_live_…` e `Idempotency-Key` (obrigatório) |
+Cada empresa tem um endereço e uma senha (`/w/<empresa>`). Não há cadastro:
+a empresa é criada no banco por um administrador:
 
-| Status | Quando |
-| --- | --- |
-| 201 | Conversão registrada (`created: true` se o lead é novo; `duplicate: true` se o lead já existia) |
-| 200 | Reenvio com a mesma `Idempotency-Key` e o mesmo payload: devolve o resultado original |
-| 400 `INVALID_REQUEST` | Payload inválido, com `details` por campo |
-| 401 `INVALID_PROJECT_KEY` | Chave ausente, inválida ou revogada |
-| 403 `ORIGIN_NOT_ALLOWED` | Origin fora dos domínios da Landing Page |
-| 404 `PROJECT_NOT_FOUND` | Projeto arquivado |
-| 409 `DUPLICATE_REQUEST` | Mesma `Idempotency-Key` com payload diferente |
-
-Regras implementadas:
-
-- Telefone normalizado para E.164 (padrão Brasil) é o identificador
-  preferencial; e-mail é o segundo. Mesmo telefone no mesmo projeto reutiliza
-  o lead e cria uma nova conversão; nunca há fusão entre projetos. E-mail que
-  já pertence a outro telefone cria um lead marcado para revisão (§6.4).
-- First touch é preservado; last touch é atualizado a cada conversão (§5.5).
-  O SDK pode enviar `tracking.first_touch`.
-- Canal classificado por click id → UTM → referrer → direct (§6.2, §6.3).
-- Campo honeypot `website`: se preenchido, responde 201 e não grava nada.
-- Toda conversão gera `lead.created` na outbox; estágios com evento geram
-  `lead.qualified`, `lead.scheduled`, `lead.won` ou `lead.lost` na mesma
-  transação, com `event_key` imutável e `transaction_id` estável para vendas.
+```sql
+select lh_private.create_workspace('Dra Letícia', 'dra-leticia', '<senha>', 'LP Transplante');
+```
 
 ## Banco de dados
 
-Todas as tabelas ficam no esquema `leadhub` (e os helpers internos em
-`leadhub_private`), para que o Lead Hub possa dividir um projeto Supabase com
-outros sistemas sem tocar nas tabelas deles. Adicione `leadhub` em
-**Project Settings → Data API → Exposed schemas**.
+Tudo fica no esquema `public` com o prefixo `lh_`, para dividir o projeto
+Supabase com outros sistemas sem configuração extra. As tabelas têm RLS ativo
+e nenhuma política: o app (com a chave pública) só consegue chamar as funções
+`lh_*`. A captura exige a chave pública da LP, e o painel exige um token de
+sessão emitido por `lh_login`. Opcionalmente, cada LP aceita dados só dos
+domínios cadastrados.
 
-Migrações em `supabase/migrations/`:
-
-| Arquivo | Conteúdo |
+| Tabela | Conteúdo |
 | --- | --- |
-| `…01_tenancy.sql` | profiles, workspaces, workspace_members, projects, helpers de RLS, `create_workspace()` |
-| `…02_leads_pipeline.sql` | landing_pages, forms, project_api_keys, pipelines, pipeline_stages, leads, lead_conversions, lead_answers, lead_stage_history, outbox_events, `move_lead_stage()` |
-| `…03_ingestion.sql` | `ingest_lead_conversion()` (somente service role) |
+| `lh_workspaces` | Empresas e hash da senha |
+| `lh_sessions` | Sessões do painel (30 dias) |
+| `lh_pages` | Landing Pages, chave pública, domínios, código no WhatsApp |
+| `lh_leads` | Uma linha por visitante que clicou no WhatsApp (ou lead manual) |
+| `lh_events` | Visitas, cliques e outros eventos da LP |
 
-Permissões (§4.3): admin e gestor configuram o projeto e veem chaves e outbox;
-comercial move estágios; cliente só lê; atendente só vê e edita os leads
-atribuídos a ele. Estágio, histórico e outbox só mudam por funções do banco;
-o histórico é append-only.
+## Ambiente de teste
+
+- App: https://leadinghub.netlify.app (Netlify, projeto `leadinghub`, branch
+  `claude/new-session-hmpokh`).
+- Banco: projeto Supabase `rda-report-panel`, tabelas `lh_*`.
+- Variáveis no Netlify: `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `NEXT_PUBLIC_APP_URL`.
+
+## Desenvolvimento
+
+```bash
+npm install
+cp .env.example .env.local   # URL e chave pública do Supabase
+npm run dev
+```
 
 ## Testes
 
 ```bash
-npm test          # unitários: normalização, atribuição, chaves, handler da API
-npm run test:db   # banco: migrações, RLS, papéis, ingestão, pipeline
+npm test          # unitários: tracker.js (jsdom), coleta, CSV, normalização, origem
+npm run test:db   # banco: captura, sessões, isolamento entre empresas, edição
 ```
 
 Os testes de banco criam um banco descartável, aplicam
-`supabase/tests/supabase-shim.sql` (papéis `anon`/`authenticated`/`service_role`,
-`auth.uid()` e os grants padrão do Supabase) e todas as migrações. Precisam de
-um PostgreSQL 15+ onde o usuário possa criar bancos e papéis:
+`supabase/tests/supabase-shim.sql` e todas as migrações, e chamam as funções
+como o papel `anon`, do mesmo jeito que o app. Precisam de um PostgreSQL 15+:
 
 ```bash
 export TEST_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres
 ```
-
-O CI (`.github/workflows/ci.yml`) roda lint, typecheck, testes unitários, testes
-de banco em PostgreSQL 17 e o build.
-
-## Próximos passos (plano do §16)
-
-- Fase 4: SDK JavaScript (`tracker.min.js`) com sessão anônima, first/last
-  touch em cookie first party e tabelas `sessions`/`touchpoints`.
-- Fase 5: registro do clique no WhatsApp na linha do tempo (US03, AC07),
-  convites de membros e responsável pelo lead.
-- Fase 6: worker da outbox, webhooks de saída assinados com HMAC, tentativas
-  com backoff e painel de diagnóstico (AC10, AC14); exportação CSV (AC12).
-- P1: Turnstile e rate limit na ingestão pública.
-- Fases 7 e 8: Meta CAPI e Google Data Manager.

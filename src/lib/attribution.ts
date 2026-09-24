@@ -13,6 +13,7 @@ export const CHANNELS = {
   email: "E-mail",
   referral: "Referral",
   direct: "Direct",
+  whatsapp_direto: "WhatsApp direto",
 } as const;
 
 export type Channel = keyof typeof CHANNELS;

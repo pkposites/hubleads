@@ -13,7 +13,6 @@
     "test:all": "vitest run"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.1",
     "libphonenumber-js": "^1.13.14",
     "next": "16.3.6",
@@ -30,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "jsdom": "^26.1.0",
     "pg": "^8.23.0",
     "tailwindcss": "^4",
     "typescript": "^5",

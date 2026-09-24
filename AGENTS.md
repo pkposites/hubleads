@@ -10,15 +10,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Lead Hub project notes
 
-- Product spec: the Lead Hub blueprint (v1.0). Build in the order of its §16 plan.
-- Commands: `npm run lint`, `npm run typecheck`, `npm test` (unit),
-  `npm run test:db` (needs `TEST_DATABASE_URL`, see README), `npm run build`.
-- Every business table has `workspace_id` and RLS. Add a cross-workspace test in
-  `tests/db/` for any new table. Schema changes go in a new file under
-  `supabase/migrations/`; never edit an applied migration.
-- Stage changes, history and outbox rows are written only by SQL functions
-  (`move_lead_stage`, `ingest_lead_conversion`), never by direct table writes.
-- The service-role client (`src/lib/supabase/admin.ts`) bypasses RLS: scope every
-  query to a workspace/project the caller was already authorised for.
-- Never log phone, e-mail, tokens or raw payloads (§15.2).
+- Product: a landing page script (`public/tracker.js`) sends visits and WhatsApp
+  clicks to `/api/collect`; each click becomes a row in a spreadsheet-style panel
+  where the attendant fills in the phone. There is no phone capture on the page.
+- Commands: `npm run lint`, `npm run typecheck`, `npm test` (unit, incl. the
+  tracker under jsdom), `npm run test:db` (needs `TEST_DATABASE_URL`, see README),
+  `npm run build`.
+- Database objects live in `public` with an `lh_` prefix (the Supabase project is
+  shared with other apps). Tables have RLS on and no policies; API roles only call
+  the `lh_*` functions, which check a page key or a session token. Helpers go in
+  `lh_private`. Schema changes go in a new file under `supabase/migrations/`; never
+  edit an applied migration.
+- The app uses only the publishable key, through `call()` in `src/lib/db.ts`.
+- Never log names, phones, codes or raw payloads.
 - UI copy is in Brazilian Portuguese.

@@ -25,7 +25,6 @@ jobs:
       # Build-time placeholders; nothing talks to Supabase during CI.
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
-      SUPABASE_SECRET_KEY: ci-placeholder
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

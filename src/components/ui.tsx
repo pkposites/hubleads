@@ -19,8 +19,11 @@ export function Button({
   return <button className={cx(buttonClass(variant), className)} {...props} />;
 }
 
-export const inputClass =
-  "w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm shadow-xs placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none";
+/** Input styling without a width, for inline controls such as filters. */
+export const controlClass =
+  "rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm shadow-xs placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none";
+
+export const inputClass = `w-full ${controlClass}`;
 
 export function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
