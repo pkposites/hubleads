@@ -47,7 +47,7 @@ describe("roles inside a workspace", () => {
       lead: { phone: "11 98888-0002", phone_norm: "+5511988880002" },
     }));
     await asUser(pool, admin, (db) =>
-      db.query("update public.leads set owner_id = $1 where id = $2", [agent, assignedLead]),
+      db.query("update leadhub.leads set owner_id = $1 where id = $2", [agent, assignedLead]),
     );
   });
 
@@ -55,7 +55,7 @@ describe("roles inside a workspace", () => {
 
   const visibleLeads = (userId: string) =>
     asUser(pool, userId, async (db) =>
-      (await db.query<{ id: string }>("select id from public.leads where project_id = $1", [projectId])).rows.map(
+      (await db.query<{ id: string }>("select id from leadhub.leads where project_id = $1", [projectId])).rows.map(
         (r) => r.id,
       ),
     );
@@ -72,22 +72,22 @@ describe("roles inside a workspace", () => {
 
   it("does not let a client move stages", async () => {
     await expect(
-      asUser(pool, client, (db) => db.query("select public.move_lead_stage($1, $2)", [otherLead, stages.contacted])),
+      asUser(pool, client, (db) => db.query("select leadhub.move_lead_stage($1, $2)", [otherLead, stages.contacted])),
     ).rejects.toThrow(/lead not found/);
   });
 
   it("lets an agent move their own lead but not someone else's", async () => {
     await asUser(pool, agent, (db) =>
-      db.query("select public.move_lead_stage($1, $2)", [assignedLead, stages.contacted]),
+      db.query("select leadhub.move_lead_stage($1, $2)", [assignedLead, stages.contacted]),
     );
     await expect(
-      asUser(pool, agent, (db) => db.query("select public.move_lead_stage($1, $2)", [otherLead, stages.contacted])),
+      asUser(pool, agent, (db) => db.query("select leadhub.move_lead_stage($1, $2)", [otherLead, stages.contacted])),
     ).rejects.toThrow(/lead not found/);
   });
 
   it("does not let an agent hand their lead to someone else", async () => {
     const updated = asUser(pool, agent, (db) =>
-      db.query("update public.leads set owner_id = $1 where id = $2", [sales, assignedLead]),
+      db.query("update leadhub.leads set owner_id = $1 where id = $2", [sales, assignedLead]),
     );
     await expect(updated).rejects.toThrow(/row-level security/);
   });
@@ -95,7 +95,7 @@ describe("roles inside a workspace", () => {
   it("only lets admins and managers see API keys and the outbox", async () => {
     await asUser(pool, admin, (db) =>
       db.query(
-        "insert into public.project_api_keys (workspace_id, project_id, name, key_prefix, key_hash) values ($1, $2, 'k', 'sk_live_abcd', $3)",
+        "insert into leadhub.project_api_keys (workspace_id, project_id, name, key_prefix, key_hash) values ($1, $2, 'k', 'sk_live_abcd', $3)",
         [workspaceId, projectId, "a".repeat(64)],
       ),
     );
@@ -107,11 +107,11 @@ describe("roles inside a workspace", () => {
       [agent, 0],
     ] as const) {
       const keys = await asUser(pool, user, async (db) =>
-        (await db.query("select id from public.project_api_keys where project_id = $1", [projectId])).rowCount,
+        (await db.query("select id from leadhub.project_api_keys where project_id = $1", [projectId])).rowCount,
       );
       expect(keys).toBe(expected);
       const events = await asUser(pool, user, async (db) =>
-        (await db.query("select id from public.outbox_events where project_id = $1", [projectId])).rowCount,
+        (await db.query("select id from leadhub.outbox_events where project_id = $1", [projectId])).rowCount,
       );
       expect(events! > 0).toBe(expected === 1);
     }
@@ -131,12 +131,12 @@ describe("roles inside a workspace", () => {
   it("does not let members write normalized or pipeline fields on leads directly", async () => {
     await expect(
       asUser(pool, admin, (db) =>
-        db.query("update public.leads set current_stage_id = $1 where id = $2", [stages.won, otherLead]),
+        db.query("update leadhub.leads set current_stage_id = $1 where id = $2", [stages.won, otherLead]),
       ),
     ).rejects.toThrow(/permission denied/);
     await expect(
       asUser(pool, admin, (db) =>
-        db.query("insert into public.leads (workspace_id, project_id) values ($1, $2)", [workspaceId, projectId]),
+        db.query("insert into leadhub.leads (workspace_id, project_id) values ($1, $2)", [workspaceId, projectId]),
       ),
     ).rejects.toThrow(/permission denied/);
   });

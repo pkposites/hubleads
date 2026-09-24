@@ -4,13 +4,13 @@
 -- it has authenticated the key, checked the Origin and normalised the input.
 -- Everything a submission touches happens in this one transaction.
 
-create or replace function public.ingest_lead_conversion(p jsonb)
+create or replace function leadhub.ingest_lead_conversion(p jsonb)
 returns jsonb
 language plpgsql
 set search_path = ''
 as $$
 declare
-  v_project public.projects;
+  v_project leadhub.projects;
   v_idempotency_key text := nullif(p ->> 'idempotency_key', '');
   v_request_hash text := nullif(p ->> 'request_hash', '');
   v_lead_in jsonb := coalesce(p -> 'lead', '{}'::jsonb);
@@ -19,20 +19,20 @@ declare
   v_touch jsonb := coalesce(p -> 'touch', '{}'::jsonb);
   v_first_touch jsonb := coalesce(nullif(p -> 'first_touch', 'null'::jsonb), p -> 'touch', '{}'::jsonb);
   v_answers jsonb := coalesce(p -> 'answers', '{}'::jsonb);
-  v_existing public.lead_conversions;
-  v_lead public.leads;
+  v_existing leadhub.lead_conversions;
+  v_lead leadhub.leads;
   v_other_id uuid;
   v_needs_review boolean := false;
   v_created boolean := false;
   v_first_stage_id uuid;
-  v_conversion public.lead_conversions;
+  v_conversion leadhub.lead_conversions;
 begin
   if jsonb_typeof(v_answers) <> 'object' then
     raise exception 'answers must be an object' using errcode = '22023';
   end if;
 
   select * into v_project
-  from public.projects
+  from leadhub.projects
   where id = (p ->> 'project_id')::uuid and status = 'active';
 
   if not found then
@@ -49,7 +49,7 @@ begin
     perform pg_advisory_xact_lock(hashtextextended('idem:' || v_project.id || ':' || v_idempotency_key, 0));
 
     select * into v_existing
-    from public.lead_conversions
+    from leadhub.lead_conversions
     where project_id = v_project.id and idempotency_key = v_idempotency_key;
 
     if found then
@@ -80,13 +80,13 @@ begin
   -- Deduplication (§6.4): phone first, then e-mail. Never across projects.
   if v_phone_norm is not null then
     select * into v_lead
-    from public.leads
+    from leadhub.leads
     where project_id = v_project.id and phone_norm = v_phone_norm;
   end if;
 
   if v_lead.id is null and v_email_norm is not null then
     select * into v_lead
-    from public.leads
+    from leadhub.leads
     where project_id = v_project.id
       and email_norm = v_email_norm
       -- An e-mail match only counts when it cannot be a different phone.
@@ -98,7 +98,7 @@ begin
   if v_email_norm is not null then
     -- Is this e-mail already attached to someone else?
     select id into v_other_id
-    from public.leads
+    from leadhub.leads
     where project_id = v_project.id
       and email_norm = v_email_norm
       and id is distinct from v_lead.id
@@ -108,12 +108,12 @@ begin
 
   if v_lead.id is null then
     select s.id into v_first_stage_id
-    from public.pipeline_stages s
+    from leadhub.pipeline_stages s
     where s.project_id = v_project.id
     order by s.position
     limit 1;
 
-    insert into public.leads (
+    insert into leadhub.leads (
       workspace_id, project_id, name, phone, phone_norm, email, email_norm,
       current_stage_id, needs_review, first_touch, last_touch, source_channel
     )
@@ -135,10 +135,10 @@ begin
 
     v_created := true;
 
-    insert into public.lead_stage_history (workspace_id, lead_id, from_stage_id, to_stage_id, metadata)
+    insert into leadhub.lead_stage_history (workspace_id, lead_id, from_stage_id, to_stage_id, metadata)
     values (v_lead.workspace_id, v_lead.id, null, v_first_stage_id, '{"reason": "created"}'::jsonb);
   else
-    update public.leads
+    update leadhub.leads
     set name = coalesce(name, nullif(v_lead_in ->> 'name', '')),
         phone = coalesce(phone, nullif(v_lead_in ->> 'phone', '')),
         phone_norm = coalesce(phone_norm, v_phone_norm),
@@ -152,7 +152,7 @@ begin
     returning * into v_lead;
   end if;
 
-  insert into public.lead_conversions (
+  insert into leadhub.lead_conversions (
     workspace_id, project_id, lead_id, form_id, landing_page_id, session_id,
     idempotency_key, request_hash, source_channel, answers, tracking, consent
   )
@@ -172,12 +172,12 @@ begin
   )
   returning * into v_conversion;
 
-  insert into public.lead_answers (conversion_id, workspace_id, lead_id, field_key, value)
+  insert into leadhub.lead_answers (conversion_id, workspace_id, lead_id, field_key, value)
   select v_conversion.id, v_lead.workspace_id, v_lead.id, a.key, a.value
   from jsonb_each_text(v_answers) as a (key, value);
 
   -- §9.2: every conversion emits lead.created.
-  insert into public.outbox_events
+  insert into leadhub.outbox_events
     (workspace_id, project_id, event_key, event_type, aggregate_type, aggregate_id, payload)
   values (
     v_lead.workspace_id,
@@ -208,5 +208,5 @@ end;
 $$;
 
 -- Service role only: never callable from the browser.
-revoke all on function public.ingest_lead_conversion(jsonb) from public, anon, authenticated;
-grant execute on function public.ingest_lead_conversion(jsonb) to service_role;
+revoke all on function leadhub.ingest_lead_conversion(jsonb) from public, anon, authenticated;
+grant execute on function leadhub.ingest_lead_conversion(jsonb) to service_role;

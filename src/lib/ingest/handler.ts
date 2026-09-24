@@ -24,7 +24,7 @@ export interface IngestDeps {
     publicKey: string,
   ): Promise<{ id: string; project_id: string; workspace_id: string; domains: string[] } | null>;
   findForm(projectId: string, ref: string): Promise<{ id: string } | null>;
-  /** Calls public.ingest_lead_conversion; rejects with `{ code }` on SQL errors. */
+  /** Calls leadhub.ingest_lead_conversion; rejects with `{ code }` on SQL errors. */
   ingest(payload: Record<string, unknown>): Promise<IngestResult>;
   markKeyUsed?(keyId: string): Promise<void>;
   log(entry: Record<string, unknown>): void;

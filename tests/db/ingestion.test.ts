@@ -33,10 +33,10 @@ describe("lead ingestion", () => {
 
     const { rows } = await pool.query(
       `select l.source_channel, s.key as stage, l.first_touch ->> 'utm_source' as first_source,
-              (select count(*) from public.lead_answers a where a.lead_id = l.id)::int as answers,
-              (select count(*) from public.lead_stage_history h where h.lead_id = l.id)::int as history,
-              (select event_type from public.outbox_events e where e.aggregate_id = l.id) as event
-         from public.leads l join public.pipeline_stages s on s.id = l.current_stage_id
+              (select count(*) from leadhub.lead_answers a where a.lead_id = l.id)::int as answers,
+              (select count(*) from leadhub.lead_stage_history h where h.lead_id = l.id)::int as history,
+              (select event_type from leadhub.outbox_events e where e.aggregate_id = l.id) as event
+         from leadhub.leads l join leadhub.pipeline_stages s on s.id = l.current_stage_id
         where l.id = $1`,
       [result.lead_id],
     );
@@ -55,7 +55,7 @@ describe("lead ingestion", () => {
     const first = await ingest(pool, input);
     const second = await ingest(pool, input);
     expect(second).toMatchObject({ lead_id: first.lead_id, conversion_id: first.conversion_id, replayed: true });
-    const { rows } = await pool.query("select count(*)::int as n from public.lead_conversions where lead_id = $1", [
+    const { rows } = await pool.query("select count(*)::int as n from leadhub.lead_conversions where lead_id = $1", [
       first.lead_id,
     ]);
     expect(rows[0].n).toBe(1);
@@ -85,8 +85,8 @@ describe("lead ingestion", () => {
 
     const { rows } = await pool.query(
       `select email_norm, source_channel, last_touch ->> 'channel' as last_channel,
-              (select count(*)::int from public.lead_conversions c where c.lead_id = l.id) as conversions
-         from public.leads l where id = $1`,
+              (select count(*)::int from leadhub.lead_conversions c where c.lead_id = l.id) as conversions
+         from leadhub.leads l where id = $1`,
       [first.lead_id],
     );
     // First touch is preserved, last touch moves, missing contact data is filled in.
@@ -117,7 +117,7 @@ describe("lead ingestion", () => {
     const first = await ingest(pool, { project_id: projectId, lead: { ...lead(16), ...email } });
     const second = await ingest(pool, { project_id: projectId, lead: { ...lead(17), ...email } });
     expect(second.lead_id).not.toBe(first.lead_id);
-    const { rows } = await pool.query("select needs_review from public.leads where id = $1", [second.lead_id]);
+    const { rows } = await pool.query("select needs_review from leadhub.leads where id = $1", [second.lead_id]);
     expect(rows[0].needs_review).toBe(true);
   });
 
@@ -136,7 +136,7 @@ describe("lead ingestion", () => {
   });
 
   it("rejects an archived or unknown project", async () => {
-    await pool.query("update public.projects set status = 'archived' where id = $1", [otherProjectId]);
+    await pool.query("update leadhub.projects set status = 'archived' where id = $1", [otherProjectId]);
     await expect(ingest(pool, { project_id: otherProjectId, lead: lead(19) })).rejects.toMatchObject({
       code: "LH404",
     });

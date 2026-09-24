@@ -19,3 +19,6 @@ export function supabasePublishableKey() {
 export function supabaseSecretKey() {
   return required("SUPABASE_SECRET_KEY", process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
+
+/** Postgres schema holding every Lead Hub table (see the first migration). */
+export const DB_SCHEMA = "leadhub";

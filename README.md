@@ -95,6 +95,11 @@ Regras implementadas:
 
 ## Banco de dados
 
+Todas as tabelas ficam no esquema `leadhub` (e os helpers internos em
+`leadhub_private`), para que o Lead Hub possa dividir um projeto Supabase com
+outros sistemas sem tocar nas tabelas deles. Adicione `leadhub` em
+**Project Settings → Data API → Exposed schemas**.
+
 Migrações em `supabase/migrations/`:
 
 | Arquivo | Conteúdo |

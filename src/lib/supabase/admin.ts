@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import { supabaseSecretKey, supabaseUrl } from "@/lib/env";
+import { DB_SCHEMA, supabaseSecretKey, supabaseUrl } from "@/lib/env";
 
 /**
  * Service-role client. Bypasses RLS, so every caller must scope its queries
@@ -8,6 +8,7 @@ import { supabaseSecretKey, supabaseUrl } from "@/lib/env";
  */
 export function createAdminClient() {
   return createClient(supabaseUrl(), supabaseSecretKey(), {
+    db: { schema: DB_SCHEMA },
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }

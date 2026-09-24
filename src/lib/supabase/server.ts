@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { supabasePublishableKey, supabaseUrl } from "@/lib/env";
+import { DB_SCHEMA, supabasePublishableKey, supabaseUrl } from "@/lib/env";
 
 /**
  * Supabase client for Server Components, Server Actions and Route Handlers,
@@ -10,6 +10,7 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(supabaseUrl(), supabasePublishableKey(), {
+    db: { schema: DB_SCHEMA },
     cookies: {
       getAll() {
         return cookieStore.getAll();

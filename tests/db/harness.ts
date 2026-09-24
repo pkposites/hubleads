@@ -53,7 +53,7 @@ export const uniqueSlug = (prefix: string) => `${prefix}-${randomUUID().slice(0,
 export async function createWorkspace(pool: Pool, adminId: string, name = "Workspace") {
   return asUser(pool, adminId, async (db) => {
     const { rows } = await db.query<{ id: string; slug: string }>(
-      "select id, slug from public.create_workspace($1, $2)",
+      "select id, slug from leadhub.create_workspace($1, $2)",
       [name, uniqueSlug("ws")],
     );
     return rows[0];
@@ -62,7 +62,7 @@ export async function createWorkspace(pool: Pool, adminId: string, name = "Works
 
 export async function addMember(pool: Pool, adminId: string, workspaceId: string, userId: string, role: string) {
   await asUser(pool, adminId, (db) =>
-    db.query("insert into public.workspace_members (workspace_id, user_id, role) values ($1, $2, $3)", [
+    db.query("insert into leadhub.workspace_members (workspace_id, user_id, role) values ($1, $2, $3)", [
       workspaceId,
       userId,
       role,
@@ -73,7 +73,7 @@ export async function addMember(pool: Pool, adminId: string, workspaceId: string
 export async function createProject(pool: Pool, userId: string, workspaceId: string, name = "Projeto") {
   return asUser(pool, userId, async (db) => {
     const { rows } = await db.query<{ id: string }>(
-      "insert into public.projects (workspace_id, name, slug) values ($1, $2, $3) returning id",
+      "insert into leadhub.projects (workspace_id, name, slug) values ($1, $2, $3) returning id",
       [workspaceId, name, uniqueSlug("prj")],
     );
     return rows[0].id;
@@ -104,7 +104,7 @@ export interface IngestResult {
 
 export async function ingest(pool: Pool, input: IngestInput) {
   return asService(pool, async (db) => {
-    const { rows } = await db.query<{ r: IngestResult }>("select public.ingest_lead_conversion($1) as r", [
+    const { rows } = await db.query<{ r: IngestResult }>("select leadhub.ingest_lead_conversion($1) as r", [
       JSON.stringify(input),
     ]);
     return rows[0].r;
@@ -114,7 +114,7 @@ export async function ingest(pool: Pool, input: IngestInput) {
 export async function stagesOf(pool: Pool, userId: string, projectId: string) {
   return asUser(pool, userId, async (db) => {
     const { rows } = await db.query<{ id: string; key: string; kind: string }>(
-      "select id, key, kind from public.pipeline_stages where project_id = $1 order by position",
+      "select id, key, kind from leadhub.pipeline_stages where project_id = $1 order by position",
       [projectId],
     );
     return Object.fromEntries(rows.map((r) => [r.key, r.id])) as Record<string, string>;

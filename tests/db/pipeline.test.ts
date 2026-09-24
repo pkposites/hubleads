@@ -24,7 +24,7 @@ describe("pipeline and stage changes", () => {
   const move = (user: string, stage: string, reason?: string, value?: number) =>
     asUser(pool, user, async (db) =>
       (
-        await db.query("select * from public.move_lead_stage($1, $2, $3, $4)", [
+        await db.query("select * from leadhub.move_lead_stage($1, $2, $3, $4)", [
           leadId,
           stage,
           reason ?? null,
@@ -71,7 +71,7 @@ describe("pipeline and stage changes", () => {
   it("does not create an outbox event for stages without one", async () => {
     await move(sales, stages.contacted);
     const { rows } = await pool.query(
-      "select event_type from public.outbox_events where aggregate_id = $1 order by created_at",
+      "select event_type from leadhub.outbox_events where aggregate_id = $1 order by created_at",
       [leadId],
     );
     expect(rows.map((r) => r.event_type)).toEqual(["lead.created"]);
@@ -80,7 +80,7 @@ describe("pipeline and stage changes", () => {
   it("enqueues the canonical event in the same transaction", async () => {
     const history = await move(sales, stages.qualified);
     const { rows } = await pool.query(
-      "select event_key, status, payload from public.outbox_events where event_type = 'lead.qualified' and aggregate_id = $1",
+      "select event_key, status, payload from leadhub.outbox_events where event_type = 'lead.qualified' and aggregate_id = $1",
       [leadId],
     );
     expect(rows).toEqual([
@@ -95,7 +95,7 @@ describe("pipeline and stage changes", () => {
   it("stores the sale value and a stable transaction id on a win", async () => {
     const history = await move(sales, stages.won, undefined, 18000);
     const { rows } = await pool.query(
-      "select l.sale_value, e.payload from public.leads l join public.outbox_events e on e.aggregate_id = l.id and e.event_type = 'lead.won' where l.id = $1",
+      "select l.sale_value, e.payload from leadhub.leads l join leadhub.outbox_events e on e.aggregate_id = l.id and e.event_type = 'lead.won' where l.id = $1",
       [leadId],
     );
     expect(rows[0].sale_value).toBe("18000.00");
@@ -106,7 +106,7 @@ describe("pipeline and stage changes", () => {
     await expect(move(sales, stages.lost)).rejects.toThrow(/lost_reason is required/);
     await expect(move(sales, stages.lost, "   ")).rejects.toThrow(/lost_reason is required/);
     await move(sales, stages.lost, "Sem orçamento");
-    const { rows } = await pool.query("select lost_reason from public.leads where id = $1", [leadId]);
+    const { rows } = await pool.query("select lost_reason from leadhub.leads where id = $1", [leadId]);
     expect(rows[0].lost_reason).toBe("Sem orçamento");
   });
 
@@ -114,16 +114,16 @@ describe("pipeline and stage changes", () => {
     await move(sales, stages.lost, "Não respondeu");
     await move(sales, stages.contacted);
     const { rows } = await pool.query(
-      "select s.key from public.lead_stage_history h join public.pipeline_stages s on s.id = h.to_stage_id where h.lead_id = $1 order by h.created_at",
+      "select s.key from leadhub.lead_stage_history h join leadhub.pipeline_stages s on s.id = h.to_stage_id where h.lead_id = $1 order by h.created_at",
       [leadId],
     );
     expect(rows.map((r) => r.key)).toEqual(["new", "lost", "contacted"]);
-    const lead = await pool.query("select lost_reason from public.leads where id = $1", [leadId]);
+    const lead = await pool.query("select lost_reason from leadhub.leads where id = $1", [leadId]);
     expect(lead.rows[0].lost_reason).toBeNull();
   });
 
   it("rejects a stage from another project", async () => {
-    const otherProject = await createProject(pool, admin, (await pool.query("select workspace_id from public.projects where id = $1", [projectId])).rows[0].workspace_id);
+    const otherProject = await createProject(pool, admin, (await pool.query("select workspace_id from leadhub.projects where id = $1", [projectId])).rows[0].workspace_id);
     const otherStages = await stagesOf(pool, admin, otherProject);
     await expect(move(sales, otherStages.contacted)).rejects.toThrow(/stage not found/);
   });
@@ -135,8 +135,8 @@ describe("pipeline and stage changes", () => {
   it("keeps the history append-only", async () => {
     await move(sales, stages.contacted);
     for (const sql of [
-      "update public.lead_stage_history set to_stage_id = null where lead_id = $1",
-      "delete from public.lead_stage_history where lead_id = $1",
+      "update leadhub.lead_stage_history set to_stage_id = null where lead_id = $1",
+      "delete from leadhub.lead_stage_history where lead_id = $1",
     ]) {
       await expect(asUser(pool, admin, (db) => db.query(sql, [leadId]))).rejects.toThrow(/permission denied/);
     }
