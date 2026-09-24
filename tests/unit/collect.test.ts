@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { deviceFrom, handleCollect, handleConfig, type CollectDeps } from "@/lib/collect";
+import { cleanAnswers, deviceFrom, handleCollect, handleConfig, type CollectDeps } from "@/lib/collect";
 
 function deps(overrides: Partial<CollectDeps> = {}) {
   const logs: Record<string, unknown>[] = [];
@@ -107,5 +107,27 @@ describe("deviceFrom", () => {
     [null, "desconhecido"],
   ])("%s -> %s", (ua, expected) => {
     expect(deviceFrom(ua)).toBe(expected);
+  });
+});
+
+describe("cleanAnswers", () => {
+  it("keeps flat, short answers and drops the rest", () => {
+    expect(
+      cleanAnswers({
+        " tempo ": " 5 anos ",
+        nota: 9,
+        ok: true,
+        areas: ["Coroa", 2, { x: 1 }],
+        nested: { a: 1 },
+        vazio: "",
+        longo: "x".repeat(600),
+        nan: Number.NaN,
+      }),
+    ).toEqual({ tempo: "5 anos", nota: 9, ok: true, areas: "Coroa, 2", longo: "x".repeat(500) });
+  });
+
+  it("caps the number of answers", () => {
+    const many = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`q${i}`, "a"]));
+    expect(Object.keys(cleanAnswers(many))).toHaveLength(40);
   });
 });

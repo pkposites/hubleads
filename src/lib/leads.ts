@@ -108,6 +108,22 @@ export function parseMoney(raw: string): number | null | "invalid" {
   return Number.isFinite(value) && value >= 0 ? Math.round(value * 100) / 100 : "invalid";
 }
 
+/** Keys the tracker adds for itself; not answers from the page. */
+const INTERNAL_EXTRA = new Set(["whatsapp_url"]);
+
+/** Answers the landing page sent with the click (quiz, form steps). */
+export function answerEntries(extra: Record<string, unknown> | null | undefined): [string, string][] {
+  return Object.entries(extra ?? {})
+    .filter(([key, value]) => !INTERNAL_EXTRA.has(key) && value !== null && value !== undefined && value !== "")
+    .map(([key, value]) => [key, typeof value === "boolean" ? (value ? "Sim" : "Não") : String(value)]);
+}
+
+/** "tempo_de_queda" -> "Tempo de queda". */
+export function answerLabel(key: string): string {
+  const text = key.replace(/[_-]+/g, " ").trim();
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 const CSV_COLUMNS: [string, (l: Lead) => unknown][] = [
   ["Data/hora do clique", (l) => l.created_at],
   ["Código", (l) => l.code],
@@ -148,7 +164,16 @@ function csvCell(value: unknown): string {
 
 /** Semicolon-separated with a BOM, which Excel in pt-BR opens correctly. */
 export function leadsToCsv(leads: readonly Lead[]): string {
-  const lines = [CSV_COLUMNS.map(([h]) => csvCell(h)).join(";")];
-  for (const lead of leads) lines.push(CSV_COLUMNS.map(([, get]) => csvCell(get(lead))).join(";"));
+  // One extra column per answer key found in the exported rows.
+  const answerKeys = [...new Set(leads.flatMap((l) => answerEntries(l.extra).map(([k]) => k)))];
+  const columns: [string, (l: Lead) => unknown][] = [
+    ...CSV_COLUMNS,
+    ...answerKeys.map((key): [string, (l: Lead) => unknown] => [
+      answerLabel(key),
+      (l) => answerEntries(l.extra).find(([k]) => k === key)?.[1],
+    ]),
+  ];
+  const lines = [columns.map(([h]) => csvCell(h)).join(";")];
+  for (const lead of leads) lines.push(columns.map(([, get]) => csvCell(get(lead))).join(";"));
   return `﻿${lines.join("\r\n")}\r\n`;
 }

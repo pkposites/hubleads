@@ -27,7 +27,9 @@ Landing Page + tracker.js ──► /api/collect ──► lh_collect() ──�
    chega, o atendente busca o código e preenche telefone, status, valor e
    observações direto na célula.
 
-Cliques repetidos do mesmo visitante somam na mesma linha e mantêm a origem da
+Respostas enviadas pela LP (por exemplo, de um quiz) aparecem na coluna
+**Respostas** e viram colunas próprias no CSV. Cliques repetidos do mesmo
+visitante somam na mesma linha e mantêm a origem da
 primeira visita. Contatos que chegaram no WhatsApp sem passar pela LP podem ser
 adicionados à mão (**+ Adicionar lead**). A planilha exporta para CSV no
 formato do Excel em português.
@@ -36,6 +38,7 @@ API do script para LPs que montam o link do WhatsApp no próprio código:
 
 ```js
 window.open(LeadHub.whatsappUrl("https://wa.me/55119..."));  // registra o clique e inclui o código
+LeadHub.set({ "Tempo de queda": "Mais de 5 anos" });          // respostas (quiz) que vão junto com o clique
 LeadHub.identify({ name: "Maria" });                          // nome no lead do visitante
 LeadHub.track("quiz_concluido", { etapa: 3 });                // qualquer outro evento
 ```

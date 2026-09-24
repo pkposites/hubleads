@@ -124,4 +124,28 @@ describe("landing page capture", () => {
     const config = await anon(pool, "select lh_page_config($1) as r", [ws.key]);
     expect(config).toEqual({ whatsapp_code: true });
   });
+
+  it("stores the page answers on the row and merges later ones", async () => {
+    await collect(pool, ws.key, {
+      type: "whatsapp_click",
+      visitor_id: "quiz-1",
+      data: { tempo_de_queda: "5 anos", investimento: "R$ 10 mil" },
+    });
+    await collect(pool, ws.key, {
+      type: "whatsapp_click",
+      visitor_id: "quiz-1",
+      data: { investimento: "R$ 20 mil", areas: "Coroa" },
+    });
+    const rows = await anon<{ rows: { visitor_id?: string; extra: Record<string, string>; clicks: number }[] }>(
+      pool,
+      "select lh_list_leads($1) as r",
+      [ws.token],
+    );
+    const lead = rows.rows.find((r) => r.extra.tempo_de_queda);
+    expect(lead).toMatchObject({
+      clicks: 2,
+      extra: { tempo_de_queda: "5 anos", investimento: "R$ 20 mil", areas: "Coroa" },
+    });
+    expect(lead?.visitor_id).toBeUndefined();
+  });
 });

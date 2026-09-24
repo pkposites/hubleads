@@ -42,6 +42,29 @@ const ATTRIBUTION_KEYS = [
   "first_seen_at",
 ] as const;
 
+/**
+ * Answers sent by the page (quiz, form steps): flat key -> short value, so they
+ * can become spreadsheet columns. Anything nested or oversized is dropped.
+ */
+export function cleanAnswers(data: Record<string, unknown> | null | undefined): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  let count = 0;
+  for (const [rawKey, value] of Object.entries(data ?? {})) {
+    if (count >= 40) break;
+    const key = rawKey.trim().slice(0, 60);
+    if (!key) continue;
+    let clean: string | number | boolean | undefined;
+    if (typeof value === "string") clean = value.trim().slice(0, 500);
+    else if (typeof value === "number" && Number.isFinite(value)) clean = value;
+    else if (typeof value === "boolean") clean = value;
+    else if (Array.isArray(value)) clean = value.filter((v) => typeof v === "string" || typeof v === "number").join(", ").slice(0, 500);
+    if (clean === undefined || clean === "") continue;
+    out[key] = clean;
+    count++;
+  }
+  return out;
+}
+
 export interface CollectDeps {
   collect(key: string, originHost: string | null, event: Record<string, unknown>): Promise<Record<string, unknown>>;
   pageConfig(key: string): Promise<{ whatsapp_code: boolean } | null>;
@@ -125,7 +148,7 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
       channel,
       device,
       attribution,
-      data: event.data ?? {},
+      data: cleanAnswers(event.data),
     });
     // Logs never carry names, codes or URLs (§15.2).
     deps.log({ route: "POST /api/collect", type: event.type, status: 200, channel, latency_ms: Date.now() - started });

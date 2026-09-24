@@ -12,9 +12,10 @@
  *   can find the row and fill in the phone.
  *
  * API for pages that open WhatsApp from their own code:
- *   LeadHub.whatsappUrl(url)         -> records the click, returns url with code
- *   LeadHub.identify({ name })       -> attaches a name to the visitor's row
- *   LeadHub.track("evento", { ... }) -> records any other event
+ *   LeadHub.whatsappUrl(url, answers?) -> records the click, returns url with code
+ *   LeadHub.set({ pergunta: "resposta" }) -> answers (e.g. a quiz) sent with the click
+ *   LeadHub.identify({ name })           -> attaches a name to the visitor's row
+ *   LeadHub.track("evento", { ... })     -> records any other event
  */
 (function () {
   "use strict";
@@ -167,16 +168,36 @@
     }
   }
 
+  // Answers collected on the page (quiz, form steps) travel with the click and
+  // end up as columns in the sheet. Kept for the tab's lifetime.
+  var answers = {};
+  try {
+    answers = JSON.parse(window.sessionStorage.getItem("lh_answers") || "{}") || {};
+  } catch (e) {}
+  function setAnswers(values) {
+    if (!values || typeof values !== "object") return;
+    for (var k in values) {
+      var v = values[k];
+      if (v === null || v === undefined || v === "") delete answers[k];
+      else answers[k] = Array.isArray(v) ? v.join(", ") : v;
+    }
+    try {
+      window.sessionStorage.setItem("lh_answers", JSON.stringify(answers));
+    } catch (e) {}
+  }
+
   var lastClick = 0;
   function recordClick(url) {
     var now = Date.now();
     if (now - lastClick < 1500) return; // one click, one row
     lastClick = now;
+    var data = { whatsapp_url: String(url).split("?")[0] };
+    for (var k in answers) data[k] = answers[k];
     send({
       type: "whatsapp_click",
       code: codeEnabled() ? code() : undefined,
       name: nameOnPage(),
-      data: { whatsapp_url: String(url).split("?")[0] },
+      data: data,
     });
   }
 
@@ -225,11 +246,13 @@
   window.LeadHub = {
     __loaded: true,
     visitorId: visitorId,
-    whatsappUrl: function (url) {
+    whatsappUrl: function (url, values) {
+      setAnswers(values);
       var withTag = withCode(url);
       recordClick(withTag);
       return withTag;
     },
+    set: setAnswers,
     identify: function (info) {
       if (info && info.name) send({ type: "identify", name: String(info.name).slice(0, 120) });
     },

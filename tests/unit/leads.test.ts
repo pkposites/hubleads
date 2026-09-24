@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { leadsToCsv, parseMoney, periodStart, type Lead } from "@/lib/leads";
+import { answerEntries, answerLabel, leadsToCsv, parseMoney, periodStart, type Lead } from "@/lib/leads";
 
 describe("parseMoney", () => {
   it.each([
@@ -50,5 +50,27 @@ describe("leadsToCsv", () => {
 
   it("neutralises formulas", () => {
     expect(leadsToCsv([lead])).toContain(`"'=HYPERLINK(""http://x"")"`);
+  });
+});
+
+describe("quiz answers", () => {
+  it("lists page answers without internal keys and labels them", () => {
+    expect(answerEntries({ whatsapp_url: "https://wa.me/1", tempo_de_queda: "5 anos", ja_fez: false, vazio: "" })).toEqual([
+      ["tempo_de_queda", "5 anos"],
+      ["ja_fez", "Não"],
+    ]);
+    expect(answerLabel("tempo_de_queda")).toBe("Tempo de queda");
+  });
+
+  it("adds one CSV column per answer key", () => {
+    const base = { created_at: "2026-09-24T12:00:00Z", code: "A", status: "novo", source: "lp", clicks: 1 };
+    const csv = leadsToCsv([
+      { ...base, extra: { tempo_de_queda: "5 anos" } },
+      { ...base, code: "B", extra: { investimento: "R$ 20 mil", whatsapp_url: "x" } },
+    ] as unknown as Lead[]);
+    const [header, a, b] = csv.replace("\uFEFF", "").split("\r\n");
+    expect(header.endsWith(";Tempo de queda;Investimento")).toBe(true);
+    expect(a.endsWith(";5 anos;")).toBe(true);
+    expect(b.endsWith(";;R$ 20 mil")).toBe(true);
   });
 });

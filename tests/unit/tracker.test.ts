@@ -172,4 +172,21 @@ describe("tracker.js", () => {
     expect(url).toMatch(/c%C3%B3d/);
     expect(sent.map((e) => e.type)).toEqual(["page_view", "whatsapp_click", "identify", "form_step"]);
   });
+
+  it("sends quiz answers with the click", async () => {
+    const { sent, flush } = load("/");
+    const api = (window as unknown as { LeadHub: { set(v: object): void; whatsappUrl(u: string, v?: object): string } }).LeadHub;
+    api.set({ tempo_de_queda: "Mais de 5 anos", areas: ["Coroa", "Entradas"] });
+    api.set({ ja_fez_tratamento: false, vazio: "" });
+    api.whatsappUrl("https://wa.me/5511999999999", { investimento: "R$ 15 a 25 mil" });
+    await flush();
+    const click = sent.find((e) => e.type === "whatsapp_click")!;
+    expect(click.data).toEqual({
+      whatsapp_url: "https://wa.me/5511999999999",
+      tempo_de_queda: "Mais de 5 anos",
+      areas: "Coroa, Entradas",
+      ja_fez_tratamento: false,
+      investimento: "R$ 15 a 25 mil",
+    });
+  });
 });

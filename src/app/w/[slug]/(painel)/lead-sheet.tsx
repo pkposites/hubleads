@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { channelLabel } from "@/lib/attribution";
 import { formatDateTime, formatMoney, formatPhone, timeSince } from "@/lib/format";
-import { STATUSES, type Lead, type Status } from "@/lib/leads";
+import { answerEntries, answerLabel, STATUSES, type Lead, type Status } from "@/lib/leads";
 import { updateLeadField, type EditableField } from "../actions";
 
 const STATUS_STYLE: Record<Status, string> = {
@@ -132,7 +132,7 @@ export function LeadSheet({ slug, leads }: { slug: string; leads: Lead[] }) {
 
   return (
     <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
-      <table className="w-full min-w-[1600px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[1800px] border-collapse text-left text-sm">
         <thead className="sticky top-0 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
           <tr className="border-b border-zinc-200">
             {[
@@ -142,6 +142,7 @@ export function LeadSheet({ slug, leads }: { slug: string; leads: Lead[] }) {
               "Telefone",
               "Status",
               "Valor",
+              "Respostas",
               "Origem",
               "Campanha",
               "Conteúdo / anúncio",
@@ -178,6 +179,20 @@ export function LeadSheet({ slug, leads }: { slug: string; leads: Lead[] }) {
               </td>
               <td className="px-1 py-0.5">
                 <TextCell slug={slug} lead={lead} field="sale_value" placeholder="R$" display={moneyDisplay} className="w-28" />
+              </td>
+              <td className="min-w-48 max-w-72 px-2 py-1.5 text-xs">
+                {answerEntries(lead.extra).length === 0 ? (
+                  <span className="text-zinc-300">—</span>
+                ) : (
+                  <dl className="space-y-0.5">
+                    {answerEntries(lead.extra).map(([key, value]) => (
+                      <div key={key}>
+                        <dt className="inline text-zinc-500">{answerLabel(key)}: </dt>
+                        <dd className="inline">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </td>
               <td className="whitespace-nowrap px-2 py-1.5">{channelLabel(lead.channel)}</td>
               <td className="px-2 py-1.5 text-xs">
