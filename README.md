@@ -36,6 +36,15 @@ demonstração útil** (§20.2) do blueprint:
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL` e, para a API de
   ingestão, `SUPABASE_SECRET_KEY`.
 
+## Modo demonstração
+
+Com `LEADHUB_DEMO=1`, o app abre direto no workspace de exemplo (Clínica
+Exen), sem login e sem banco. As páginas usam um cliente em memória
+(`src/lib/demo/`) que responde às mesmas consultas do Supabase. As mudanças de
+cada visitante (estágios, projetos, leads de teste) ficam num cookie e podem
+ser descartadas em **Reiniciar dados**. A API de ingestão responde 503 nesse
+modo. O ambiente de teste no Netlify roda assim.
+
 ## Como rodar
 
 1. Crie um projeto no Supabase (ou use `npx supabase start` com Docker).

@@ -1,3 +1,4 @@
+import { isDemoMode } from "@/lib/demo/mode";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CORS_HEADERS, handleLeadIngest, type IngestResult } from "@/lib/ingest/handler";
 
@@ -12,6 +13,12 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (isDemoMode()) {
+    return Response.json(
+      { error: { code: "DEMO_MODE", message: "API de ingestão desativada no modo demonstração." } },
+      { status: 503 },
+    );
+  }
   const db = createAdminClient();
 
   return handleLeadIngest(request, {

@@ -1,10 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Card } from "@/components/ui";
+import { isDemoMode } from "@/lib/demo/mode";
+import { DEMO_WORKSPACE_SLUG } from "@/lib/demo/seed";
 import { ROLE_LABELS, type Role, type Workspace } from "@/lib/types";
 import { requireUser } from "@/lib/workspace";
 import { CreateWorkspaceForm } from "./create-workspace-form";
 
 export default async function Home() {
+  if (isDemoMode()) redirect(`/w/${DEMO_WORKSPACE_SLUG}/leads`);
+
   const { supabase, userId, email } = await requireUser();
   const { data, error } = await supabase
     .from("workspace_members")

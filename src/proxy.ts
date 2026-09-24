@@ -1,11 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isDemoMode } from "@/lib/demo/mode";
 import { supabasePublishableKey, supabaseUrl } from "@/lib/env";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 
 /** Refreshes the Supabase session cookie and sends signed-out users to /login. */
 export async function proxy(request: NextRequest) {
+  if (isDemoMode()) return NextResponse.next({ request });
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(supabaseUrl(), supabasePublishableKey(), {

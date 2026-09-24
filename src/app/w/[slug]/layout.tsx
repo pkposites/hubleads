@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { resetDemo } from "@/app/demo-actions";
+import { isDemoMode } from "@/lib/demo/mode";
 import { ROLE_LABELS } from "@/lib/types";
 import { getWorkspaceContext } from "@/lib/workspace";
 
 export default async function WorkspaceLayout({ children, params }: LayoutProps<"/w/[slug]">) {
   const { slug } = await params;
   const { workspace, role, email } = await getWorkspaceContext(slug);
+  const demo = isDemoMode();
 
   return (
     <div className="flex flex-1 flex-col">
@@ -24,12 +27,25 @@ export default async function WorkspaceLayout({ children, params }: LayoutProps<
             </Link>
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm text-zinc-600">
-            <span>
-              {email} · {ROLE_LABELS[role]}
-            </span>
-            <form action="/auth/signout" method="post">
-              <button className="hover:underline">Sair</button>
-            </form>
+            {demo ? (
+              <>
+                <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  Demonstração · dados de exemplo
+                </span>
+                <form action={resetDemo}>
+                  <button className="hover:underline">Reiniciar dados</button>
+                </form>
+              </>
+            ) : (
+              <>
+                <span>
+                  {email} · {ROLE_LABELS[role]}
+                </span>
+                <form action="/auth/signout" method="post">
+                  <button className="hover:underline">Sair</button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </header>

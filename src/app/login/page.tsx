@@ -1,6 +1,9 @@
+import { redirect } from "next/navigation";
+import { isDemoMode } from "@/lib/demo/mode";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+  if (isDemoMode()) redirect("/");
   const { next, error } = await searchParams;
   return (
     <main className="flex flex-1 items-center justify-center p-6">
