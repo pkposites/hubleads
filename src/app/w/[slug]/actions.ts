@@ -4,12 +4,11 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { call, DbError } from "@/lib/db";
-import { normalizeDomain } from "@/lib/domains";
 import { isStatus, parseMoney, type Lead } from "@/lib/leads";
 import { normalizePhone } from "@/lib/normalize";
 import { requireWorkspace, SESSION_COOKIE } from "@/lib/session";
 
-export type FormState = { error?: string; ok?: string } | undefined;
+export type FormState = { error?: string; ok?: string; slug?: string } | undefined;
 
 export async function login(_prev: FormState, formData: FormData): Promise<FormState> {
   const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
@@ -17,7 +16,8 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
   if (!slug || !password) return { error: "Informe a empresa e a senha." };
 
   const result = await call<{ token: string; slug: string } | null>("lh_login", { p_slug: slug, p_password: password });
-  if (!result) return { error: "Empresa ou senha incorretos." };
+  // Returned so the form keeps the company after a failed attempt.
+  if (!result) return { error: "Empresa ou senha incorretos.", slug };
 
   (await cookies()).set(SESSION_COOKIE, result.token, {
     httpOnly: true,
@@ -83,6 +83,20 @@ export async function updateLeadField(
   }
 }
 
+/** Admin sessions only (checked again in the database). */
+export async function deleteLeads(slug: string, leadIds: string[]): Promise<{ deleted?: number; error?: string }> {
+  const { token, workspace } = await requireWorkspace(slug);
+  if (workspace.role !== "admin") return { error: "Só o administrador pode excluir linhas." };
+  if (leadIds.length === 0 || leadIds.length > 500) return { error: "Selecione entre 1 e 500 linhas." };
+  try {
+    const deleted = await call<number>("lh_delete_leads", { p_token: token, p_lead_ids: leadIds });
+    revalidatePath(`/w/${slug}`);
+    return { deleted };
+  } catch {
+    return { error: "Não foi possível excluir." };
+  }
+}
+
 export async function createLead(slug: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const { token } = await requireWorkspace(slug);
   const name = String(formData.get("name") ?? "").trim();
@@ -99,21 +113,4 @@ export async function createLead(slug: string, _prev: FormState, formData: FormD
   });
   revalidatePath(`/w/${slug}`);
   return { ok: "Lead adicionado." };
-}
-
-export async function updatePage(slug: string, pageId: string, _prev: FormState, formData: FormData): Promise<FormState> {
-  const { token } = await requireWorkspace(slug);
-  const rawDomains = String(formData.get("domains") ?? "").split(/[\s,]+/).filter(Boolean);
-  const domains = rawDomains.map(normalizeDomain);
-  if (domains.some((d) => !d)) return { error: "Domínio inválido. Use algo como clinica.com.br ou *.clinica.com.br." };
-
-  await call("lh_update_page", {
-    p_token: token,
-    p_page_id: pageId,
-    p_name: String(formData.get("name") ?? ""),
-    p_domains: [...new Set(domains)],
-    p_whatsapp_code: formData.get("whatsapp_code") === "on",
-  });
-  revalidatePath(`/w/${slug}/instalacao`);
-  return { ok: "Configuração salva." };
 }

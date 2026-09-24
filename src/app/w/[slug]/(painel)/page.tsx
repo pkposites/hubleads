@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { buttonClass, controlClass, EmptyState } from "@/components/ui";
 import { CHANNELS } from "@/lib/attribution";
 import { call } from "@/lib/db";
@@ -29,7 +28,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
   const channel = first(sp.origem) in CHANNELS ? first(sp.origem) : "";
   const q = first(sp.q).trim().slice(0, 100);
 
-  const { token } = await requireWorkspace(slug);
+  const { token, workspace } = await requireWorkspace(slug);
   const since = periodStart(period)?.toISOString() ?? null;
 
   const [stats, list] = await Promise.all([
@@ -97,19 +96,12 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
 
       {list.rows.length === 0 ? (
         <EmptyState title={q || status || channel ? "Nenhum lead com esses filtros" : "Nenhum clique no WhatsApp ainda"}>
-          {!(q || status || channel) && (
-            <>
-              Instale o código na Landing Page em{" "}
-              <Link href={`/w/${slug}/instalacao`} className="underline">
-                Instalação na LP
-              </Link>
-              . Cada clique no botão de WhatsApp aparece aqui em segundos.
-            </>
-          )}
+          {!(q || status || channel) &&
+            "Assim que alguém clicar no WhatsApp da Landing Page, a linha aparece aqui em segundos."}
         </EmptyState>
       ) : (
         <>
-          <LeadSheet slug={slug} leads={list.rows} />
+          <LeadSheet slug={slug} leads={list.rows} canDelete={workspace.role === "admin"} />
           <p className="text-xs text-zinc-500">
             {list.total} {list.total === 1 ? "linha" : "linhas"}
             {list.total > list.rows.length && ` (mostrando as ${list.rows.length} mais recentes; exporte para ver todas)`}.

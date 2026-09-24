@@ -12,6 +12,9 @@ export default async function Home() {
         <h1 className="text-lg font-semibold">Lead Hub</h1>
         <p className="mb-5 text-sm text-zinc-600">Leads da sua Landing Page, do anúncio ao atendimento.</p>
         <LoginForm />
+        <a href="/admin" className="mt-4 block text-center text-xs text-zinc-500 hover:underline">
+          Acesso do administrador
+        </a>
       </div>
     </main>
   );

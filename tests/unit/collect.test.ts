@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cleanAnswers, deviceFrom, handleCollect, handleConfig, type CollectDeps } from "@/lib/collect";
+import { cleanAnswers, clientIp, deviceFrom, handleCollect, handleConfig, type CollectDeps } from "@/lib/collect";
 
 function deps(overrides: Partial<CollectDeps> = {}) {
   const logs: Record<string, unknown>[] = [];
@@ -91,6 +91,25 @@ describe("POST /api/collect", () => {
   });
 });
 
+describe("phone from the landing page", () => {
+  it.each([
+    ["(11) 91234-5678", "+5511912345678"],
+    ["+55 11 91234-5678", "+5511912345678"],
+    ["123", "123"],
+    ["  ", undefined],
+  ])("%j is stored as %j", async (phone, expected) => {
+    const d = deps();
+    await handleCollect(post({ ...event, phone }), d);
+    expect(vi.mocked(d.collect).mock.calls[0][2].phone).toBe(expected);
+  });
+
+  it("never logs the phone", async () => {
+    const d = deps();
+    await handleCollect(post({ ...event, phone: "(11) 91234-5678" }), d);
+    expect(JSON.stringify(d.logs)).not.toMatch(/1234|5678/);
+  });
+});
+
 describe("GET /api/collect", () => {
   it("returns the page settings for a known key", async () => {
     const res = await handleConfig(new Request("https://leadhub.test/api/collect?key=pk_ok"), deps());
@@ -129,5 +148,23 @@ describe("cleanAnswers", () => {
   it("caps the number of answers", () => {
     const many = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`q${i}`, "a"]));
     expect(Object.keys(cleanAnswers(many))).toHaveLength(40);
+  });
+});
+
+describe("data for Meta's Conversions API", () => {
+  it("records the visitor IP and user agent", async () => {
+    const d = deps();
+    await handleCollect(post(event, { "x-nf-client-connection-ip": "200.100.50.25" }), d);
+    const payload = vi.mocked(d.collect).mock.calls[0][2];
+    expect(payload).toMatchObject({ ip_address: "200.100.50.25", user_agent: expect.stringContaining("iPhone") });
+  });
+
+  it.each([
+    [{ "x-forwarded-for": "187.1.2.3, 10.0.0.1" }, "187.1.2.3"],
+    [{ "x-real-ip": "2804:14c::1" }, "2804:14c::1"],
+    [{ "x-forwarded-for": "<script>" }, undefined],
+    [{}, undefined],
+  ])("reads the IP from %j", (headers, expected) => {
+    expect(clientIp(new Request("https://x.test", { headers }))).toBe(expected);
   });
 });

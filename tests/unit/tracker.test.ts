@@ -66,6 +66,7 @@ function whatsappLink(href: string) {
 describe("tracker.js", () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     document.cookie = "_fbp=fb.1.1727180000.987654";
     document.cookie = "_fbc=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   });
@@ -188,5 +189,37 @@ describe("tracker.js", () => {
       ja_fez_tratamento: false,
       investimento: "R$ 15 a 25 mil",
     });
+  });
+
+  it("sends the name and phone given with identify along with the click", async () => {
+    const { sent, flush } = load("/");
+    const api = (window as unknown as { LeadHub: { identify(i: object): void; whatsappUrl(u: string): string } }).LeadHub;
+    api.identify({ name: " Ana Lima ", phone: "(11) 91234-5678" });
+    api.whatsappUrl("https://wa.me/5511999999999");
+    await flush();
+    expect(sent.find((e) => e.type === "identify")).toMatchObject({ name: "Ana Lima", phone: "(11) 91234-5678" });
+    expect(sent.find((e) => e.type === "whatsapp_click")).toMatchObject({ name: "Ana Lima", phone: "(11) 91234-5678" });
+  });
+
+  it("picks up a phone field typed on the page", async () => {
+    const { sent, flush } = load("/");
+    document.body.innerHTML = '<input name="nome" value="Bia"><input type="tel" name="whatsapp" value="11 98888-7777">';
+    window.open("https://wa.me/5511999999999");
+    await flush();
+    expect(sent.find((e) => e.type === "whatsapp_click")).toMatchObject({ name: "Bia", phone: "11 98888-7777" });
+  });
+
+  it("keeps Meta's names and every URL parameter", async () => {
+    const { sent, flush } = load(
+      "/?utm_source=facebook&utm_campaign=Transplante%20SP&campaign_name=Transplante%20SP&adset_name=SP%2030-55&ad_name=V%C3%ADdeo%2001&placement=Instagram_Stories&criativo=v1",
+    );
+    await flush();
+    expect(sent[0].attribution).toMatchObject({
+      campaign_name: "Transplante SP",
+      adset_name: "SP 30-55",
+      ad_name: "Vídeo 01",
+      placement: "Instagram_Stories",
+    });
+    expect(sent[0].url_params).toMatchObject({ criativo: "v1", utm_source: "facebook" });
   });
 });

@@ -23,6 +23,15 @@ export async function anon<T = unknown>(pool: Pool, sql: string, params: unknown
   }
 }
 
+/** Creates an admin and returns an admin session token. */
+export async function setupAdmin(pool: Pool) {
+  const login = `admin-${randomUUID().slice(0, 8)}@example.com`;
+  const password = `admin-senha-${randomUUID().slice(0, 8)}`;
+  await pool.query("select lh_private.create_admin($1, $2)", [login, password]);
+  const session = await anon<{ token: string }>(pool, "select lh_admin_login($1, $2) as r", [login, password]);
+  return { login, password, token: session.token };
+}
+
 export interface Setup {
   workspaceId: string;
   pageId: string;
@@ -49,10 +58,14 @@ export interface CollectEvent {
   visitor_id: string;
   url?: string;
   name?: string;
+  phone?: string;
   code?: string;
   channel?: string;
   device?: string;
   attribution?: Record<string, string>;
+  url_params?: Record<string, string>;
+  ip_address?: string;
+  user_agent?: string;
   data?: Record<string, unknown>;
 }
 
@@ -65,6 +78,7 @@ export const collect = (pool: Pool, key: string, event: CollectEvent, host = "cl
 
 export interface LeadRow {
   id: string;
+  extra: Record<string, unknown>;
   code: string;
   name: string | null;
   phone: string | null;
@@ -85,3 +99,5 @@ export const listLeads = (pool: Pool, token: string, filters: { status?: string;
     filters.status ?? null,
     filters.search ?? null,
   ]);
+
+export const uniqueSlug = (prefix: string) => `${prefix}-${randomUUID().slice(0, 8)}`;

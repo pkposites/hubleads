@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { call, DbError } from "@/lib/db";
+import { call } from "@/lib/db";
 
 export const SESSION_COOKIE = "lh_session";
 
@@ -10,19 +10,16 @@ export interface Workspace {
   id: string;
   name: string;
   slug: string;
+  /** "atendente" (client password) or "admin" (opened from the admin panel). */
+  role: "atendente" | "admin";
 }
 
 /** The workspace of the current session, or null when there is none. */
 export const currentSession = cache(async (): Promise<{ token: string; workspace: Workspace } | null> => {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  try {
-    const workspace = await call<Workspace | null>("lh_session", { p_token: token });
-    return workspace ? { token, workspace } : null;
-  } catch (error) {
-    if (error instanceof DbError && error.code === "LH401") return null;
-    throw error;
-  }
+  const workspace = await call<Workspace | null>("lh_session", { p_token: token });
+  return workspace ? { token, workspace } : null;
 });
 
 /** Session for the workspace in the URL, or a redirect to its password page. */

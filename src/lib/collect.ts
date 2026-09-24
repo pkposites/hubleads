@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { classifyChannel } from "@/lib/attribution";
+import { normalizePhone } from "@/lib/normalize";
 
 // POST /api/collect: events sent by public/tracker.js. Kept free of Next.js
 // and the database client so it can be tested with plain Requests.
@@ -15,8 +16,10 @@ const eventSchema = z.object({
   url: text(2000),
   title: text(300),
   name: text(120),
+  phone: text(40),
   code: z.string().regex(/^[2-9A-HJ-NP-Z]{4,8}$/i).optional().nullable(),
   attribution: z.record(z.string(), z.unknown()).optional().nullable(),
+  url_params: z.record(z.string(), z.unknown()).optional().nullable(),
   data: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
@@ -35,6 +38,12 @@ const ATTRIBUTION_KEYS = [
   "campaign_id",
   "adset_id",
   "ad_id",
+  "utm_id",
+  "campaign_name",
+  "adset_name",
+  "ad_name",
+  "placement",
+  "site_source_name",
   "fbc",
   "fbp",
   "landing_url",
@@ -92,6 +101,14 @@ export function deviceFrom(userAgent: string | null): string {
   return ua ? "desktop" : "desconhecido";
 }
 
+/** Visitor IP as seen by the host (Netlify, Vercel or a generic proxy). */
+export function clientIp(request: Request): string | undefined {
+  const direct = request.headers.get("x-nf-client-connection-ip") ?? request.headers.get("x-real-ip");
+  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0];
+  const ip = (direct ?? forwarded)?.trim();
+  return ip && /^[0-9a-f:.]{3,45}$/i.test(ip) ? ip : undefined;
+}
+
 function originHost(request: Request): string | null {
   for (const header of ["origin", "referer"]) {
     const value = request.headers.get(header);
@@ -144,10 +161,17 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
       url: event.url,
       title: event.title,
       name: event.name?.trim() || undefined,
+      // E.164 when valid (so the same number always matches); otherwise the
+      // digits as typed, for the attendant to check.
+      phone: event.phone?.trim() ? (normalizePhone(event.phone) ?? event.phone.replace(/[^\d+]/g, "").slice(0, 20)) || undefined : undefined,
       code: event.code?.toUpperCase(),
       channel,
       device,
       attribution,
+      url_params: cleanAnswers(event.url_params),
+      // Kept for Meta's Conversions API (client_ip_address / client_user_agent).
+      ip_address: clientIp(request),
+      user_agent: request.headers.get("user-agent")?.slice(0, 500) || undefined,
       data: cleanAnswers(event.data),
     });
     // Logs never carry names, codes or URLs (§15.2).

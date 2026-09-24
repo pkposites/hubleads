@@ -14,7 +14,7 @@
  * API for pages that open WhatsApp from their own code:
  *   LeadHub.whatsappUrl(url, answers?) -> records the click, returns url with code
  *   LeadHub.set({ pergunta: "resposta" }) -> answers (e.g. a quiz) sent with the click
- *   LeadHub.identify({ name })           -> attaches a name to the visitor's row
+ *   LeadHub.identify({ name, phone })    -> contact typed on the page, sent with the click
  *   LeadHub.track("evento", { ... })     -> records any other event
  */
 (function () {
@@ -32,7 +32,8 @@
   var TRACKING_PARAMS = [
     "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
     "gclid", "gbraid", "wbraid", "fbclid", "ttclid", "msclkid",
-    "campaign_id", "adset_id", "ad_id",
+    "campaign_id", "adset_id", "ad_id", "utm_id",
+    "campaign_name", "adset_name", "ad_name", "placement", "site_source_name",
   ];
   var CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   var WHATSAPP_RE = /^(https?:\/\/(wa\.me|(api|web|www)\.whatsapp\.com)\/|whatsapp:\/\/)/i;
@@ -99,6 +100,16 @@
         hasParams = true;
       }
     });
+    // Every other parameter too (custom ones the ad or the page may use).
+    var all = {};
+    var count = 0;
+    params.forEach(function (v, k) {
+      if (v && count < 30 && k.length <= 60) {
+        all[k] = v.slice(0, 300);
+        count++;
+      }
+    });
+    if (count) fromUrl.url_params = all;
 
     // A visit that arrives with tracking params replaces the previous ones;
     // otherwise the last known source is kept (e.g. the visitor came back).
@@ -113,7 +124,8 @@
     }
 
     var result = {};
-    for (var k in attr) if (k !== "saved_at" && attr[k] != null) result[k] = attr[k];
+    for (var k in attr) if (k !== "saved_at" && k !== "url_params" && attr[k] != null) result[k] = attr[k];
+    urlParams = attr.url_params || {};
     result.fbp = cookie("_fbp") || undefined;
     result.fbc =
       cookie("_fbc") ||
@@ -121,6 +133,7 @@
     return result;
   }
 
+  var urlParams = {};
   var attribution = readAttribution();
 
   // --- sending -------------------------------------------------------------
@@ -130,6 +143,7 @@
     event.url = window.location.href.split("#")[0];
     event.title = document.title;
     event.attribution = attribution;
+    event.url_params = urlParams;
     var body = JSON.stringify(event);
     try {
       // text/plain avoids a CORS preflight; sendBeacon survives navigation.
@@ -146,13 +160,32 @@
     return get("lh_code_enabled") !== "false";
   }
 
-  function nameOnPage() {
-    var input = document.querySelector(
-      'input[name="nome" i], input[name="name" i], input[name*="nome" i], input[id*="nome" i], input[autocomplete="name"]'
-    );
-    var v = input && input.value && input.value.trim();
-    return v ? v.slice(0, 120) : undefined;
+  function fieldOnPage(selector, max) {
+    var inputs = document.querySelectorAll(selector);
+    for (var i = 0; i < inputs.length; i++) {
+      var v = inputs[i].value && inputs[i].value.trim();
+      if (v) return v.slice(0, max);
+    }
+    return undefined;
   }
+  function nameOnPage() {
+    return fieldOnPage(
+      'input[name="nome" i], input[name="name" i], input[name*="nome" i], input[id*="nome" i], input[autocomplete="name"]',
+      120
+    );
+  }
+  function phoneOnPage() {
+    return fieldOnPage(
+      'input[type="tel"], input[name*="telefone" i], input[name*="phone" i], input[name*="whats" i], input[name*="celular" i], input[autocomplete="tel"]',
+      40
+    );
+  }
+
+  // Contact given through LeadHub.identify (e.g. a name/phone step before WhatsApp).
+  var contact = {};
+  try {
+    contact = JSON.parse(window.sessionStorage.getItem("lh_contact") || "{}") || {};
+  } catch (e) {}
 
   function withCode(url) {
     if (!codeEnabled()) return url;
@@ -196,7 +229,8 @@
     send({
       type: "whatsapp_click",
       code: codeEnabled() ? code() : undefined,
-      name: nameOnPage(),
+      name: contact.name || nameOnPage(),
+      phone: contact.phone || phoneOnPage(),
       data: data,
     });
   }
@@ -254,7 +288,14 @@
     },
     set: setAnswers,
     identify: function (info) {
-      if (info && info.name) send({ type: "identify", name: String(info.name).slice(0, 120) });
+      if (!info) return;
+      if (info.name) contact.name = String(info.name).trim().slice(0, 120);
+      if (info.phone) contact.phone = String(info.phone).trim().slice(0, 40);
+      try {
+        window.sessionStorage.setItem("lh_contact", JSON.stringify(contact));
+      } catch (e) {}
+      // Also updates a row created by an earlier click of this visitor.
+      if (contact.name || contact.phone) send({ type: "identify", name: contact.name, phone: contact.phone });
     },
     track: function (type, data) {
       if (typeof type === "string" && type) send({ type: type.slice(0, 40), data: data || {} });

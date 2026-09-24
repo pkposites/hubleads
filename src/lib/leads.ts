@@ -32,6 +32,12 @@ export interface Lead {
   campaign_id: string | null;
   adset_id: string | null;
   ad_id: string | null;
+  campaign_name: string | null;
+  adset_name: string | null;
+  ad_name: string | null;
+  placement: string | null;
+  site_source_name: string | null;
+  url_params: Record<string, unknown>;
   fbclid: string | null;
   gclid: string | null;
   fbc: string | null;
@@ -124,6 +130,15 @@ export function answerLabel(key: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** Meta ads usually send names in utm_* (campaign / term = ad set / content = ad). */
+export function adNames(l: Lead) {
+  return {
+    campaign: l.campaign_name || l.utm_campaign,
+    adset: l.adset_name || l.utm_term,
+    ad: l.ad_name || l.utm_content,
+  };
+}
+
 const CSV_COLUMNS: [string, (l: Lead) => unknown][] = [
   ["Data/hora do clique", (l) => l.created_at],
   ["Código", (l) => l.code],
@@ -133,6 +148,9 @@ const CSV_COLUMNS: [string, (l: Lead) => unknown][] = [
   ["Valor da venda", (l) => l.sale_value],
   ["Observações", (l) => l.notes],
   ["Origem", (l) => channelLabel(l.channel)],
+  ["Campanha", (l) => adNames(l).campaign],
+  ["Conjunto", (l) => adNames(l).adset],
+  ["Anúncio", (l) => adNames(l).ad],
   ["utm_source", (l) => l.utm_source],
   ["utm_medium", (l) => l.utm_medium],
   ["utm_campaign", (l) => l.utm_campaign],
@@ -141,6 +159,11 @@ const CSV_COLUMNS: [string, (l: Lead) => unknown][] = [
   ["campaign_id", (l) => l.campaign_id],
   ["adset_id", (l) => l.adset_id],
   ["ad_id", (l) => l.ad_id],
+  ["campaign_name", (l) => l.campaign_name],
+  ["adset_name", (l) => l.adset_name],
+  ["ad_name", (l) => l.ad_name],
+  ["placement", (l) => l.placement],
+  ["site_source_name", (l) => l.site_source_name],
   ["gclid", (l) => l.gclid],
   ["fbclid", (l) => l.fbclid],
   ["fbc", (l) => l.fbc],
@@ -152,6 +175,7 @@ const CSV_COLUMNS: [string, (l: Lead) => unknown][] = [
   ["Último clique", (l) => l.last_click_at],
   ["Primeira visita", (l) => l.first_seen_at],
   ["Entrada", (l) => (l.source === "manual" ? "Manual" : "Landing Page")],
+  ["Parâmetros da URL", (l) => (l.url_params && Object.keys(l.url_params).length ? JSON.stringify(l.url_params) : "")],
 ];
 
 function csvCell(value: unknown): string {

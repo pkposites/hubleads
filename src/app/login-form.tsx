@@ -12,7 +12,7 @@ export function LoginForm({ slug }: { slug?: string }) {
         <input type="hidden" name="slug" value={slug} />
       ) : (
         <Field label="Empresa" hint="O endereço que você recebeu, por exemplo dra-leticia.">
-          <input name="slug" required autoCapitalize="none" className={inputClass} />
+          <input name="slug" required autoCapitalize="none" defaultValue={state?.slug} className={inputClass} />
         </Field>
       )}
       <Field label="Senha">

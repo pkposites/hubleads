@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Button } from "@/components/ui";
 import { channelLabel } from "@/lib/attribution";
 import { formatDateTime, formatMoney, formatPhone, timeSince } from "@/lib/format";
-import { answerEntries, answerLabel, STATUSES, type Lead, type Status } from "@/lib/leads";
-import { updateLeadField, type EditableField } from "../actions";
+import { adNames, answerEntries, answerLabel, STATUSES, type Lead, type Status } from "@/lib/leads";
+import { deleteLeads, updateLeadField, type EditableField } from "../actions";
 
 const STATUS_STYLE: Record<Status, string> = {
   novo: "bg-sky-50 text-sky-800",
@@ -125,16 +126,132 @@ const path = (url: string | null) => {
 
 const muted = (v: string | null | undefined) => v || <span className="text-zinc-300">—</span>;
 
-export function LeadSheet({ slug, leads }: { slug: string; leads: Lead[] }) {
+function AdCell({ name, id }: { name: string | null; id: string | null }) {
+  return (
+    <td className="max-w-48 px-2 py-1.5 text-xs">
+      <div className="break-words">{muted(name)}</div>
+      {id && <div className="font-mono text-zinc-500">#{id}</div>}
+    </td>
+  );
+}
+
+/** Confirmation step before rows are deleted for good. */
+function DeleteDialog({
+  leads,
+  onCancel,
+  onConfirm,
+  pending,
+  error,
+}: {
+  leads: Lead[];
+  onCancel: () => void;
+  onConfirm: () => void;
+  pending: boolean;
+  error: string | null;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+        <h2 className="text-base font-semibold">
+          Excluir {leads.length} {leads.length === 1 ? "linha" : "linhas"}?
+        </h2>
+        <p className="mt-2 text-sm text-zinc-600">
+          Esta ação não pode ser desfeita. As visitas e cliques dessas linhas também saem dos indicadores.
+        </p>
+        <ul className="mt-3 max-h-40 overflow-auto rounded border border-zinc-200 text-sm">
+          {leads.map((l) => (
+            <li key={l.id} className="flex justify-between gap-2 border-b border-zinc-100 px-3 py-1.5 last:border-0">
+              <span>
+                <span className="font-mono text-xs">{l.code}</span> {l.name ?? "Sem nome"}
+              </span>
+              <span className="text-xs text-zinc-500">{formatDateTime(l.created_at)}</span>
+            </li>
+          ))}
+        </ul>
+        {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onCancel} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={onConfirm} disabled={pending}>
+            {pending ? "Excluindo..." : "Excluir definitivamente"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LeadSheet({ slug, leads, canDelete = false }: { slug: string; leads: Lead[]; canDelete?: boolean }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, startDelete] = useTransition();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const visibleSelected = leads.filter((l) => selected.has(l.id));
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const allSelected = leads.length > 0 && visibleSelected.length === leads.length;
+
   const moneyDisplay = (v: unknown) =>
     v === null || v === undefined || v === "" ? "" : formatMoney(v as number).replace(/ /g, " ");
   const phoneDisplay = (v: unknown) => (v ? formatPhone(String(v)) : "");
 
   return (
+    <div className="flex flex-col gap-2">
+      {canDelete && visibleSelected.length > 0 && (
+        <div className="flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm">
+          <span>
+            {visibleSelected.length} {visibleSelected.length === 1 ? "linha selecionada" : "linhas selecionadas"}
+          </span>
+          <Button variant="danger" onClick={() => setConfirming(true)}>
+            Excluir linhas
+          </Button>
+          <button className="text-zinc-600 hover:underline" onClick={() => setSelected(new Set())}>
+            Limpar seleção
+          </button>
+        </div>
+      )}
+      {confirming && (
+        <DeleteDialog
+          leads={visibleSelected}
+          pending={deleting}
+          error={deleteError}
+          onCancel={() => {
+            setConfirming(false);
+            setDeleteError(null);
+          }}
+          onConfirm={() =>
+            startDelete(async () => {
+              const result = await deleteLeads(slug, visibleSelected.map((l) => l.id));
+              if (result.error) {
+                setDeleteError(result.error);
+              } else {
+                setConfirming(false);
+                setSelected(new Set());
+              }
+            })
+          }
+        />
+      )}
     <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
-      <table className="w-full min-w-[1800px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[1900px] border-collapse text-left text-sm">
         <thead className="sticky top-0 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
           <tr className="border-b border-zinc-200">
+            {canDelete && (
+              <th className="px-2 py-2">
+                <input
+                  type="checkbox"
+                  aria-label="Selecionar todas"
+                  checked={allSelected}
+                  onChange={() => setSelected(allSelected ? new Set() : new Set(leads.map((l) => l.id)))}
+                />
+              </th>
+            )}
             {[
               "Clique",
               "Cód.",
@@ -145,8 +262,8 @@ export function LeadSheet({ slug, leads }: { slug: string; leads: Lead[] }) {
               "Respostas",
               "Origem",
               "Campanha",
-              "Conteúdo / anúncio",
-              "Termo",
+              "Conjunto",
+              "Anúncio",
               "Página",
               "Dispositivo",
               "Cliques",
@@ -160,7 +277,17 @@ export function LeadSheet({ slug, leads }: { slug: string; leads: Lead[] }) {
         </thead>
         <tbody className="divide-y divide-zinc-100">
           {leads.map((lead) => (
-            <tr key={lead.id} className="align-top hover:bg-zinc-50/60">
+            <tr key={lead.id} className={`align-top hover:bg-zinc-50/60 ${selected.has(lead.id) ? "bg-red-50/60" : ""}`}>
+              {canDelete && (
+                <td className="px-2 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label={`Selecionar ${lead.code}`}
+                    checked={selected.has(lead.id)}
+                    onChange={() => toggle(lead.id)}
+                  />
+                </td>
+              )}
               <td className="whitespace-nowrap px-2 py-1.5 text-xs">
                 <div>{formatDateTime(lead.created_at)}</div>
                 <div className="text-zinc-500">{timeSince(lead.created_at)}</div>
@@ -195,18 +322,16 @@ export function LeadSheet({ slug, leads }: { slug: string; leads: Lead[] }) {
                 )}
               </td>
               <td className="whitespace-nowrap px-2 py-1.5">{channelLabel(lead.channel)}</td>
-              <td className="px-2 py-1.5 text-xs">
-                <div>{muted(lead.utm_campaign)}</div>
+              <td className="max-w-48 px-2 py-1.5 text-xs">
+                <div className="break-words">{muted(adNames(lead).campaign)}</div>
+                {lead.campaign_id && <div className="font-mono text-zinc-500">#{lead.campaign_id}</div>}
                 <div className="text-zinc-500">
                   {lead.utm_source}
                   {lead.utm_medium && ` / ${lead.utm_medium}`}
                 </div>
               </td>
-              <td className="px-2 py-1.5 text-xs">
-                <div>{muted(lead.utm_content)}</div>
-                {lead.ad_id && <div className="font-mono text-zinc-500">#{lead.ad_id}</div>}
-              </td>
-              <td className="px-2 py-1.5 text-xs">{muted(lead.utm_term)}</td>
+              <AdCell name={adNames(lead).adset} id={lead.adset_id} />
+              <AdCell name={adNames(lead).ad} id={lead.ad_id} />
               <td className="max-w-40 truncate px-2 py-1.5 text-xs" title={lead.landing_url ?? undefined}>
                 {path(lead.landing_url)}
               </td>
@@ -219,6 +344,7 @@ export function LeadSheet({ slug, leads }: { slug: string; leads: Lead[] }) {
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   );
 }

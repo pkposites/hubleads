@@ -28,7 +28,9 @@ Landing Page + tracker.js ──► /api/collect ──► lh_collect() ──�
    observações direto na célula.
 
 Respostas enviadas pela LP (por exemplo, de um quiz) aparecem na coluna
-**Respostas** e viram colunas próprias no CSV. Cliques repetidos do mesmo
+**Respostas** e viram colunas próprias no CSV. Quando a LP pede nome e telefone antes do WhatsApp, a linha já chega
+preenchida, e um novo clique com o mesmo telefone (mesmo de outro aparelho)
+soma na mesma linha. Cliques repetidos do mesmo
 visitante somam na mesma linha e mantêm a origem da
 primeira visita. Contatos que chegaram no WhatsApp sem passar pela LP podem ser
 adicionados à mão (**+ Adicionar lead**). A planilha exporta para CSV no
@@ -39,17 +41,37 @@ API do script para LPs que montam o link do WhatsApp no próprio código:
 ```js
 window.open(LeadHub.whatsappUrl("https://wa.me/55119..."));  // registra o clique e inclui o código
 LeadHub.set({ "Tempo de queda": "Mais de 5 anos" });          // respostas (quiz) que vão junto com o clique
-LeadHub.identify({ name: "Maria" });                          // nome no lead do visitante
+LeadHub.identify({ name: "Maria", phone: "(11) 91234-5678" }); // contato pedido antes do WhatsApp
 LeadHub.track("quiz_concluido", { etapa: 3 });                // qualquer outro evento
 ```
 
 ## Acesso
 
-Cada empresa tem um endereço e uma senha (`/w/<empresa>`). Não há cadastro:
-a empresa é criada no banco por um administrador:
+- **Painel mãe** (`/admin`): o administrador cria clientes e Landing Pages,
+  copia o código e o prompt de instalação de cada LP, gera ou troca a senha
+  do atendente, vê os eventos recebidos, abre a planilha de qualquer cliente
+  e exclui linhas (por exemplo, testes) com uma etapa de confirmação.
+  Administradores são criados no banco:
+  ```sql
+  select lh_private.create_admin('email@exemplo.com', '<senha com 10+ caracteres>');
+  ```
+- **Atendente** (`/w/<cliente>`): entra com a senha do cliente e vê só a
+  planilha. Pode editar nome, telefone, status, valor e observações, mas não
+  exclui linhas nem vê configurações.
 
-```sql
-select lh_private.create_workspace('Dra Letícia', 'dra-leticia', '<senha>', 'LP Transplante');
+## Dados para a Meta
+
+Para enviar conversões à Meta no futuro (Conversions API), cada lead guarda:
+nome e ID da campanha, do conjunto e do anúncio, posicionamento, todas as
+UTMs e demais parâmetros da URL, `fbclid`, `fbc` e `fbp`, a URL da página,
+o horário do clique e o IP e o navegador do visitante. IP e navegador não
+aparecem na planilha.
+
+Parâmetros de URL recomendados nos anúncios da Meta (o `fbclid` a Meta
+acrescenta sozinha):
+
+```
+utm_source=facebook&utm_medium=paid_social&utm_campaign={{campaign.name}}&utm_term={{adset.name}}&utm_content={{ad.name}}&campaign_id={{campaign.id}}&adset_id={{adset.id}}&ad_id={{ad.id}}&placement={{placement}}&site_source_name={{site_source_name}}
 ```
 
 ## Banco de dados
@@ -63,8 +85,9 @@ domínios cadastrados.
 
 | Tabela | Conteúdo |
 | --- | --- |
-| `lh_workspaces` | Empresas e hash da senha |
-| `lh_sessions` | Sessões do painel (30 dias) |
+| `lh_admins`, `lh_admin_sessions` | Administradores do painel mãe e suas sessões |
+| `lh_workspaces` | Clientes e hash da senha do atendente |
+| `lh_sessions` | Sessões da planilha: atendente (30 dias) ou administrador (12 h) |
 | `lh_pages` | Landing Pages, chave pública, domínios, código no WhatsApp |
 | `lh_leads` | Uma linha por visitante que clicou no WhatsApp (ou lead manual) |
 | `lh_events` | Visitas, cliques e outros eventos da LP |

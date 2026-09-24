@@ -38,3 +38,7 @@ export function slugify(text: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 64);
 }
+
+export function isWithinDays(iso: string | null | undefined, days: number, now = new Date()) {
+  return Boolean(iso) && now.getTime() - new Date(iso as string).getTime() < days * 86_400_000;
+}
