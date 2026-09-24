@@ -27,6 +27,15 @@ demonstração útil** (§20.2) do blueprint:
 | Validação | zod, libphonenumber-js |
 | Testes | Vitest; testes de banco contra um PostgreSQL real |
 
+## Ambiente de teste
+
+- App: https://leadinghub.netlify.app (Netlify, projeto `leadinghub`, build do
+  branch `claude/new-session-hmpokh`).
+- Banco: projeto Supabase `rda-report-panel`, esquema `leadhub`.
+- Variáveis no Netlify: `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL` e, para a API de
+  ingestão, `SUPABASE_SECRET_KEY`.
+
 ## Como rodar
 
 1. Crie um projeto no Supabase (ou use `npx supabase start` com Docker).
