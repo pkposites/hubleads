@@ -6,7 +6,7 @@ import { CreateWorkspaceForm } from "./create-workspace-form";
 
 export default async function Home() {
   const { supabase, userId, email } = await requireUser();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("workspace_members")
     .select("role, workspaces (id, name, slug)")
     .eq("user_id", userId)
@@ -26,7 +26,13 @@ export default async function Home() {
       </header>
 
       <Card title="Seus workspaces">
-        {memberships.length === 0 ? (
+        {error ? (
+          <p className="text-sm text-red-700" role="alert">
+            {error.code === "PGRST106"
+              ? "O banco não está liberando o esquema leadhub. No Supabase, adicione leadhub em Project Settings → Data API → Exposed schemas."
+              : "Não foi possível carregar seus workspaces. Tente novamente em instantes."}
+          </p>
+        ) : memberships.length === 0 ? (
           <p className="text-sm text-zinc-600">Você ainda não participa de nenhum workspace. Crie o primeiro abaixo.</p>
         ) : (
           <ul className="divide-y divide-zinc-100">
