@@ -22,5 +22,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   `lh_private`. Schema changes go in a new file under `supabase/migrations/`; never
   edit an applied migration.
 - The app uses only the publishable key, through `call()` in `src/lib/db.ts`.
+  Server-only functions (`lh_server_*`: push targets, Meta token) also need
+  `LH_SERVER_SECRET` (`src/lib/server.ts`); never call them from client code.
 - Never log names, phones, codes or raw payloads.
 - UI copy is in Brazilian Portuguese.

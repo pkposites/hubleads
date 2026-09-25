@@ -49,8 +49,76 @@ export interface Lead {
   clicks: number;
   last_click_at: string;
   extra: Record<string, unknown>;
+  first_contact_at: string | null;
+  next_contact_at: string | null;
+  lost_reason: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export const LOST_REASONS = [
+  "Sem resposta",
+  "Preço",
+  "Sem interesse",
+  "Fechou com outro",
+  "Fora da região",
+  "Só pesquisando",
+  "Contato inválido",
+] as const;
+
+export interface Template {
+  id: string;
+  name: string;
+  body: string;
+  position: number;
+}
+
+/** Fills {nome} (first name) and {empresa} in a ready-made message. */
+export function fillTemplate(body: string, values: { name: string | null; company: string }) {
+  const first = values.name?.trim().split(/\s+/)[0] ?? "";
+  return body
+    .replace(/\{nome\}/gi, first)
+    .replace(/\{empresa\}/gi, values.company)
+    .replace(/,\s*!/g, "!")
+    .replace(/\s+([!?,.])/g, "$1")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+export interface Queue {
+  waiting: Lead[];
+  overdue: Lead[];
+  today: Lead[];
+}
+
+export interface HistoryEntry {
+  type: string;
+  from: string | null;
+  to: string | null;
+  actor: string;
+  at: string;
+}
+
+export interface AttendanceMetrics {
+  first_contact_median_min: number | null;
+  contacted: number;
+  within_5_min: number;
+  waiting: number;
+  lost_reasons: { reason: string; count: number }[];
+}
+
+/** "12 min", "2 h 5 min", "3 dias". */
+export function formatMinutes(minutes: number | null | undefined) {
+  if (minutes === null || minutes === undefined) return "—";
+  const m = Math.round(Number(minutes));
+  if (m < 60) return `${m} min`;
+  if (m < 24 * 60) {
+    const h = Math.floor(m / 60);
+    const rest = m % 60;
+    return rest ? `${h} h ${rest} min` : `${h} h`;
+  }
+  const days = Math.round(m / (24 * 60));
+  return `${days} ${days === 1 ? "dia" : "dias"}`;
 }
 
 export interface Stats {
@@ -147,6 +215,9 @@ const CSV_COLUMNS: [string, (l: Lead) => unknown][] = [
   ["Status", (l) => STATUSES[l.status]],
   ["Valor da venda", (l) => l.sale_value],
   ["Observações", (l) => l.notes],
+  ["Motivo da perda", (l) => l.lost_reason],
+  ["Próximo contato", (l) => l.next_contact_at],
+  ["Primeiro contato", (l) => l.first_contact_at],
   ["Origem", (l) => channelLabel(l.channel)],
   ["Campanha", (l) => adNames(l).campaign],
   ["Conjunto", (l) => adNames(l).adset],

@@ -7,7 +7,9 @@ import { call, DbError } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 import type { LeadEvent } from "@/lib/leads";
 import { openClientSheet } from "../../../actions";
+import { serverSecret } from "@/lib/server";
 import { AddPageForm, PageSettings, ResetPassword } from "./client-actions";
+import { MetaSettings, type MetaSettingsData } from "./meta-settings";
 
 const TYPE_LABEL: Record<string, string> = {
   page_view: "Visita",
@@ -26,7 +28,10 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
     if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) notFound();
     throw error;
   }
-  const events = await call<LeadEvent[]>("lh_admin_list_events", { p_token: token, p_workspace_id: id, p_limit: 50 });
+  const [events, meta] = await Promise.all([
+    call<LeadEvent[]>("lh_admin_list_events", { p_token: token, p_workspace_id: id, p_limit: 50 }),
+    call<MetaSettingsData>("lh_admin_get_meta", { p_token: token, p_workspace_id: id }),
+  ]);
   const origin = await appOrigin();
 
   return (
@@ -78,6 +83,10 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
           </div>
         </Card>
       ))}
+
+      <Card title="Conversões para a Meta (API de Conversões)">
+        <MetaSettings workspaceId={client.id} data={meta} serverReady={Boolean(serverSecret())} />
+      </Card>
 
       <Card title="Adicionar outra Landing Page">
         <AddPageForm workspaceId={client.id} />

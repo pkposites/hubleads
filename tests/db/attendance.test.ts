@@ -100,6 +100,10 @@ describe("attendance tools", () => {
     );
     expect(queue.waiting.map((l) => l.id)).toEqual([first]);
     expect(queue.overdue.map((l) => l.id)).toEqual([second]);
+
+    const counts = await anon<{ waiting: number; due: number; latest: string }>(pool, "select lh_queue_count($1) as r", [other.token]);
+    expect(counts).toMatchObject({ waiting: 1, due: 1 });
+    expect(counts.latest).toBeTruthy();
   });
 
   it("seeds message templates and lets only admins change them", async () => {

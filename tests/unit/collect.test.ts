@@ -44,6 +44,17 @@ const post = (body: unknown, headers: Record<string, string> = {}) =>
   });
 
 describe("POST /api/collect", () => {
+  it("announces only clicks that created a new row", async () => {
+    const onNewLead = vi.fn();
+    const created = deps({ onNewLead, collect: vi.fn(async () => ({ ok: true, lead_id: "L1", new_lead: true })) });
+    await handleCollect(post(event), created);
+    expect(onNewLead).toHaveBeenCalledWith("L1");
+
+    const repeat = deps({ onNewLead, collect: vi.fn(async () => ({ ok: true, lead_id: "L1", new_lead: false })) });
+    await handleCollect(post(event), repeat);
+    expect(onNewLead).toHaveBeenCalledTimes(1);
+  });
+
   it("classifies the visit and forwards a clean event", async () => {
     const d = deps();
     const res = await handleCollect(post(event), d);

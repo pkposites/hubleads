@@ -1,9 +1,11 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
+import { appOrigin, requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
+import { clientIp } from "@/lib/collect";
+import { sendTestConversion } from "@/lib/conversions";
 import { call, DbError } from "@/lib/db";
 import { normalizeDomain } from "@/lib/domains";
 import { slugify } from "@/lib/format";
@@ -94,7 +96,7 @@ export async function openClientSheet(workspaceId: string) {
     p_workspace_id: workspaceId,
   });
   (await cookies()).set(SESSION_COOKIE, session.token, cookieOptions(60 * 60 * 12));
-  redirect(`/w/${session.slug}`);
+  redirect(`/w/${session.slug}/atender`);
 }
 
 export async function updatePageSettings(
@@ -129,4 +131,44 @@ export async function addPage(workspaceId: string, _prev: AdminFormState, formDa
   });
   revalidatePath(`/admin/clientes/${workspaceId}`);
   return { ok: "Landing Page adicionada." };
+}
+
+/** Meta Conversions API settings. A blank token keeps the saved one. */
+export async function saveMetaSettings(workspaceId: string, _prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  const { token } = await requireAdmin();
+  const pixelId = String(formData.get("pixel_id") ?? "").trim();
+  if (!/^\d{5,30}$/.test(pixelId)) return { error: "ID do pixel (conjunto de dados) inválido: use só os números." };
+  try {
+    await call("lh_admin_set_meta", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_pixel_id: pixelId,
+      p_access_token: String(formData.get("access_token") ?? "").trim(),
+      p_test_event_code: String(formData.get("test_event_code") ?? "").trim(),
+      p_enabled: formData.get("enabled") === "on",
+      p_send_schedule: formData.get("send_schedule") === "on",
+      p_send_purchase: formData.get("send_purchase") === "on",
+    });
+  } catch (error) {
+    if (error instanceof DbError && error.code === "22023") return { error: "Informe o token de acesso." };
+    return { error: "Não foi possível salvar." };
+  }
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+  return { ok: "Salvo." };
+}
+
+export async function sendMetaTest(workspaceId: string): Promise<{ ok: boolean; message: string }> {
+  await requireAdmin();
+  const h = await headers();
+  const request = new Request("https://x", { headers: h });
+  const result = await sendTestConversion(workspaceId, {
+    ip: clientIp(request),
+    userAgent: h.get("user-agent") ?? undefined,
+    url: await appOrigin(),
+  });
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+  return {
+    ok: result.ok,
+    message: result.ok ? "Evento de teste enviado. Confira em Testar eventos no Gerenciador de Eventos." : `Falhou: ${result.response}`,
+  };
 }

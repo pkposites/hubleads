@@ -4,7 +4,7 @@ import { LoginForm } from "./login-form";
 
 export default async function Home() {
   const session = await currentSession();
-  if (session) redirect(`/w/${session.workspace.slug}`);
+  if (session) redirect(`/w/${session.workspace.slug}/atender`);
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">

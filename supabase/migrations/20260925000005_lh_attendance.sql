@@ -408,6 +408,22 @@ begin
 end;
 $$;
 
+-- Counts for the navigation badge and the new-lead sound, cheap enough to poll.
+create or replace function public.lh_queue_count(p_token text)
+returns jsonb
+language sql
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'waiting', count(*) filter (where l.status = 'novo'),
+    'due', count(*) filter (where l.next_contact_at < now() and l.status not in ('venda', 'perdido')),
+    'latest', max(l.created_at)
+  )
+  from public.lh_leads l
+  where l.workspace_id = lh_private.workspace_for(p_token)
+$$;
+
 -- ---------------------------------------------------------------------------
 -- Templates
 -- ---------------------------------------------------------------------------
@@ -770,6 +786,7 @@ begin
     'lh_log_contact(text, uuid, text)',
     'lh_lead_detail(text, uuid)',
     'lh_queue(text)',
+    'lh_queue_count(text)',
     'lh_list_templates(text)',
     'lh_save_template(text, uuid, text, text, int)',
     'lh_delete_template(text, uuid)',

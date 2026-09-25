@@ -3,16 +3,17 @@ import { call } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
 import {
   DIMENSIONS,
+  formatMinutes,
   formatRate,
   PERIODS,
   periodStart,
   rate,
+  type AttendanceMetrics,
   type Dimension,
   type Metrics,
   type MetricsRow,
 } from "@/lib/leads";
 import { requireWorkspace } from "@/lib/session";
-import { AutoRefresh } from "../auto-refresh";
 import { PillLinks } from "../period-tabs";
 import { DailyCharts } from "./daily-charts";
 
@@ -51,11 +52,13 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
   const dimension = (first(sp.por) in DIMENSIONS ? first(sp.por) : "channel") as Dimension;
   const { token } = await requireWorkspace(slug);
 
-  const metrics = await call<Metrics>("lh_metrics", {
-    p_token: token,
-    p_since: periodStart(period)?.toISOString() ?? null,
-    p_dimension: dimension,
-  });
+  const since = periodStart(period)?.toISOString() ?? null;
+  const [metrics, attendance] = await Promise.all([
+    call<Metrics>("lh_metrics", { p_token: token, p_since: since, p_dimension: dimension }),
+    call<AttendanceMetrics>("lh_attendance_metrics", { p_token: token, p_since: since }),
+  ]);
+  const within5 = rate(attendance.within_5_min, attendance.contacted);
+  const lostTotal = attendance.lost_reasons.reduce((sum, r) => sum + r.count, 0);
   const t = metrics.totals;
   const conversion = rate(t.clickers, t.visitors);
   const href = (changes: Record<string, string>) =>
@@ -72,7 +75,6 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
-      <AutoRefresh seconds={30} />
       <PillLinks label="Período" options={PERIODS} active={period} href={(k) => href({ periodo: k })} />
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5">
@@ -135,6 +137,49 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
             + {t.manual_leads} {t.manual_leads === 1 ? "lead adicionado" : "leads adicionados"} à mão (fora do funil da LP).
           </p>
         )}
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-5">
+        <h2 className="text-sm font-semibold">Atendimento</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div>
+            <div className="text-xs text-zinc-500">Tempo até o 1º contato</div>
+            <div className="text-2xl font-semibold tabular-nums">{formatMinutes(attendance.first_contact_median_min)}</div>
+            <div className="text-xs text-zinc-500">mediana de {attendance.contacted} {attendance.contacted === 1 ? "lead" : "leads"}</div>
+          </div>
+          <div>
+            <div className="text-xs text-zinc-500">Respondidos em até 5 min</div>
+            <div className="text-2xl font-semibold tabular-nums">{formatRate(within5)}</div>
+            <div className="mt-1.5">
+              <Meter value={within5} label="Respondidos em até 5 minutos" />
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-zinc-500">Aguardando agora</div>
+            <div className="text-2xl font-semibold tabular-nums">{attendance.waiting}</div>
+            <div className="text-xs text-zinc-500">sem primeiro contato</div>
+          </div>
+        </div>
+        <div>
+          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Motivos de perda</h3>
+          {lostTotal === 0 ? (
+            <p className="text-sm text-zinc-500">Nenhum lead perdido neste período.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {attendance.lost_reasons.map((r) => (
+                <li key={r.reason} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1">
+                  <span className="text-sm">{r.reason}</span>
+                  <span className="text-sm font-semibold tabular-nums">
+                    {r.count} <span className="font-normal text-zinc-500">· {formatRate(rate(r.count, lostTotal))}</span>
+                  </span>
+                  <div className="col-span-2 h-2 rounded-sm bg-zinc-100">
+                    <div className="h-full rounded-r-[4px] bg-[#2a78d6]" style={{ width: `${(r.count / lostTotal) * 100}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </section>
 
       {metrics.daily.length > 0 && (

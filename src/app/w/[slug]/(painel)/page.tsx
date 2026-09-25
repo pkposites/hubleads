@@ -5,7 +5,6 @@ import { call } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
 import { formatRate, isStatus, PERIODS, periodStart, rate, STATUSES, type Lead, type Stats } from "@/lib/leads";
 import { requireWorkspace } from "@/lib/session";
-import { AutoRefresh } from "./auto-refresh";
 import { LeadSheet } from "./lead-sheet";
 import { NewLeadForm } from "./new-lead-form";
 
@@ -29,7 +28,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
   const channel = first(sp.origem) in CHANNELS ? first(sp.origem) : "";
   const q = first(sp.q).trim().slice(0, 100);
 
-  const { token, workspace } = await requireWorkspace(slug);
+  const { token } = await requireWorkspace(slug);
   const since = periodStart(period)?.toISOString() ?? null;
 
   const [stats, list] = await Promise.all([
@@ -49,7 +48,6 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
 
   return (
     <div className="flex flex-col gap-4">
-      <AutoRefresh />
       <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5">
         <Link
           href={`/w/${slug}/metricas?periodo=${period}`}
@@ -108,7 +106,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
         </EmptyState>
       ) : (
         <>
-          <LeadSheet slug={slug} leads={list.rows} canDelete={workspace.role === "admin"} />
+          <LeadSheet leads={list.rows} />
           <p className="text-xs text-zinc-500">
             {list.total} {list.total === 1 ? "linha" : "linhas"}
             {list.total > list.rows.length && ` (mostrando as ${list.rows.length} mais recentes; exporte para ver todas)`}.

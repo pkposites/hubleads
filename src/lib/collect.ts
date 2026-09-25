@@ -78,6 +78,8 @@ export interface CollectDeps {
   collect(key: string, originHost: string | null, event: Record<string, unknown>): Promise<Record<string, unknown>>;
   pageConfig(key: string): Promise<{ whatsapp_code: boolean } | null>;
   log(entry: Record<string, unknown>): void;
+  /** Runs after the response when a click created a new row (notifications). */
+  onNewLead?(leadId: string): void;
 }
 
 export const COLLECT_CORS = {
@@ -176,6 +178,7 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
     });
     // Logs never carry names, codes or URLs (§15.2).
     deps.log({ route: "POST /api/collect", type: event.type, status: 200, channel, latency_ms: Date.now() - started });
+    if (result.new_lead === true && typeof result.lead_id === "string") deps.onNewLead?.(result.lead_id);
     return json(200, { ok: true, code: result.code ?? null });
   } catch (error) {
     const code = (error as { code?: string } | null)?.code;

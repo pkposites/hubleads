@@ -59,6 +59,43 @@ LeadHub.track("quiz_concluido", { etapa: 3 });                // qualquer outro 
   planilha. Pode editar nome, telefone, status, valor e observações, mas não
   exclui linhas nem vê configurações.
 
+## Atendimento
+
+- **Atender** (primeira tela do atendente): fila de quem clicou e ainda não
+  recebeu contato, do mais antigo para o mais novo, com o tempo de espera
+  (verde até 5 min, amarelo até 30, vermelho depois), mais os retornos
+  atrasados e os de hoje. A aba mostra quantos estão esperando.
+- **Mensagens prontas**: o botão **WhatsApp** de cada lead abre a conversa com
+  uma mensagem escolhida, já com o primeiro nome (`{nome}`) e o nome da empresa
+  (`{empresa}`). Abrir a conversa registra o primeiro contato e passa o lead de
+  Novo para Em atendimento. O administrador edita as mensagens na aba
+  **Mensagens**; o atendente só vê.
+- **Retorno**: cada lead pode ter data de próximo contato (atalhos "Amanhã 9h",
+  "Em 3 dias"...). No dia, ele volta para a fila.
+- **Motivo da perda**: marcar como Perdido pede o motivo, que aparece nas
+  métricas.
+- **Histórico**: cada lead guarda tudo o que aconteceu (clique, telefone,
+  status, mensagens, retornos, envios para a Meta), com quem fez e quando.
+- **Avisos**: o Lead Hub pode ser instalado como app (no iPhone, pela opção
+  "Adicionar à Tela de Início" do Safari) e avisar cada novo lead com uma
+  notificação, mesmo fechado (**Ativar avisos** no topo). Com o painel aberto,
+  toca um som e o título da aba mostra quantos esperam.
+
+## Conversões para a Meta
+
+No painel mãe, em cada cliente, **Conversões para a Meta** guarda o ID do
+pixel e o token da API de Conversões (o token nunca volta para o navegador;
+só aparecem os 4 últimos caracteres). Com o envio ligado:
+
+- Agendado → evento `Schedule`;
+- Venda com valor → evento `Purchase` com o valor em BRL.
+
+Cada evento vai uma vez por lead (`event_id` = lead + evento), com telefone e
+nome em SHA-256, `fbc`, `fbp`, IP e navegador do clique. Com um código de
+teste, os eventos aparecem só em "Testar eventos" do Gerenciador de Eventos.
+A versão da Graph API pode ser trocada com `META_GRAPH_VERSION` (padrão
+`v24.0`).
+
 ## Métricas
 
 A aba **Métricas** (visível para o atendente e para o administrador) mostra a
@@ -67,7 +104,9 @@ pessoas que visitaram (cliques repetidos da mesma pessoa contam uma vez). Traz
 também o funil (visitaram → clicaram → com telefone → agendaram → compraram),
 os visitantes e a conversão por dia, e o aproveitamento por origem, campanha,
 conjunto, anúncio ou dispositivo. Leads adicionados à mão ficam fora do funil
-da LP e aparecem numa nota à parte.
+da LP e aparecem numa nota à parte. A seção **Atendimento** mostra a mediana
+do tempo até o primeiro contato, quantos foram respondidos em até 5 minutos e
+os motivos de perda.
 
 Todas as telas funcionam no celular: a planilha vira uma lista de cartões
 editáveis (com botão para abrir o WhatsApp do lead), e os gráficos mostram os
@@ -105,6 +144,17 @@ domínios cadastrados.
 | `lh_pages` | Landing Pages, chave pública, domínios, código no WhatsApp |
 | `lh_leads` | Uma linha por visitante que clicou no WhatsApp (ou lead manual) |
 | `lh_events` | Visitas, cliques e outros eventos da LP |
+| `lh_lead_history` | Histórico de cada lead (gravado por gatilho) |
+| `lh_templates` | Mensagens prontas de cada cliente |
+| `lh_push_subscriptions` | Aparelhos que recebem avisos de novo lead |
+| `lh_meta_configs`, `lh_meta_events` | Pixel/token da Meta e registro dos envios |
+
+As funções `lh_server_*` (avisos e Meta) só respondem ao servidor do app, que
+se identifica com um segredo guardado como hash:
+
+```sql
+select lh_private.set_server_secret('<mesmo valor de LH_SERVER_SECRET>');
+```
 
 ## Ambiente de teste
 
@@ -112,7 +162,12 @@ domínios cadastrados.
   `claude/new-session-hmpokh`).
 - Banco: projeto Supabase `rda-report-panel`, tabelas `lh_*`.
 - Variáveis no Netlify: `NEXT_PUBLIC_SUPABASE_URL`,
-  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` e `NEXT_PUBLIC_APP_URL`.
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL`,
+  `LH_SERVER_SECRET` (32+ caracteres, o mesmo do banco),
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` (gerar com
+  `npx web-push generate-vapid-keys`) e, opcional, `META_GRAPH_VERSION`.
+  Sem o segredo ou as chaves VAPID, avisos e envio à Meta ficam desligados e o
+  resto funciona normalmente.
 
 ## Desenvolvimento
 

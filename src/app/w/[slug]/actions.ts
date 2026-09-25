@@ -3,8 +3,11 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { sendLeadConversions } from "@/lib/conversions";
 import { call, DbError } from "@/lib/db";
-import { isStatus, parseMoney, type Lead } from "@/lib/leads";
+import { fromLocalInput } from "@/lib/format";
+import { isStatus, parseMoney, type HistoryEntry, type Lead, type Status, type Template } from "@/lib/leads";
 import { normalizePhone } from "@/lib/normalize";
 import { requireWorkspace, SESSION_COOKIE } from "@/lib/session";
 
@@ -26,7 +29,7 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
-  redirect(`/w/${result.slug}`);
+  redirect(`/w/${result.slug}/atender`);
 }
 
 export async function logout(slug: string) {
@@ -37,7 +40,13 @@ export async function logout(slug: string) {
   redirect(`/w/${slug}/entrar`);
 }
 
-export type EditableField = "name" | "phone" | "status" | "notes" | "sale_value";
+export type EditableField = "name" | "phone" | "status" | "notes" | "sale_value" | "next_contact_at";
+
+/** Booked or sold leads may owe an event to Meta (sent after the response). */
+function afterSave(slug: string, lead: Lead) {
+  revalidatePath(`/w/${slug}`, "layout");
+  if (lead.status === "agendado" || lead.status === "venda") after(() => sendLeadConversions(lead.id));
+}
 
 /** Saves one cell of the sheet. Returns the stored value or an error. */
 export async function updateLeadField(
@@ -66,6 +75,13 @@ export async function updateLeadField(
       value = money ?? "";
       break;
     }
+    case "next_contact_at":
+      if (value) {
+        const iso = fromLocalInput(String(value));
+        if (!iso) return { error: "Data inválida." };
+        value = iso;
+      }
+      break;
     case "name":
     case "notes":
       break;
@@ -75,12 +91,119 @@ export async function updateLeadField(
 
   try {
     const lead = await call<Lead>("lh_update_lead", { p_token: token, p_lead_id: leadId, p_patch: { [field]: value } });
-    revalidatePath(`/w/${slug}`);
+    afterSave(slug, lead);
     return { value: lead[field] };
+  } catch (error) {
+    if (error instanceof DbError && error.code === "LH404") return { error: "Lead não encontrado." };
+    if (error instanceof DbError && error.code === "22023") return { error: "Informe o motivo da perda." };
+    return { error: "Não foi possível salvar." };
+  }
+}
+
+/** Status change; "perdido" needs a reason. */
+export async function setLeadStatus(
+  slug: string,
+  leadId: string,
+  status: Status,
+  lostReason?: string,
+): Promise<{ lead?: Lead; error?: string }> {
+  const { token } = await requireWorkspace(slug);
+  if (!isStatus(status)) return { error: "Status inválido." };
+  const reason = lostReason?.trim().slice(0, 200) ?? "";
+  if (status === "perdido" && !reason) return { error: "Informe o motivo da perda." };
+  try {
+    const lead = await call<Lead>("lh_update_lead", {
+      p_token: token,
+      p_lead_id: leadId,
+      p_patch: status === "perdido" ? { status, lost_reason: reason } : { status },
+    });
+    afterSave(slug, lead);
+    return { lead };
   } catch (error) {
     if (error instanceof DbError && error.code === "LH404") return { error: "Lead não encontrado." };
     return { error: "Não foi possível salvar." };
   }
+}
+
+/** A WhatsApp message was opened for the lead (first contact, "novo" -> "em atendimento"). */
+export async function logContact(slug: string, leadId: string, template: string): Promise<{ lead?: Lead; error?: string }> {
+  const { token } = await requireWorkspace(slug);
+  try {
+    const lead = await call<Lead>("lh_log_contact", { p_token: token, p_lead_id: leadId, p_template: template.slice(0, 60) });
+    revalidatePath(`/w/${slug}`, "layout");
+    return { lead };
+  } catch {
+    return { error: "Não foi possível registrar o contato." };
+  }
+}
+
+export async function leadHistory(slug: string, leadId: string): Promise<{ history?: HistoryEntry[]; error?: string }> {
+  const { token } = await requireWorkspace(slug);
+  try {
+    const detail = await call<{ history: HistoryEntry[] }>("lh_lead_detail", { p_token: token, p_lead_id: leadId });
+    return { history: detail.history };
+  } catch {
+    return { error: "Não foi possível carregar o histórico." };
+  }
+}
+
+export async function saveTemplate(slug: string, id: string | null, _prev: FormState, formData: FormData): Promise<FormState> {
+  const { token, workspace } = await requireWorkspace(slug);
+  if (workspace.role !== "admin") return { error: "Só o administrador altera as mensagens." };
+  const name = String(formData.get("name") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+  const position = Number(formData.get("position") ?? 99);
+  if (!name || name.length > 60) return { error: "Dê um nome curto (até 60 caracteres)." };
+  if (!body || body.length > 1000) return { error: "Escreva a mensagem (até 1000 caracteres)." };
+  try {
+    await call<Template>("lh_save_template", {
+      p_token: token,
+      p_id: id,
+      p_name: name,
+      p_body: body,
+      p_position: Number.isFinite(position) ? Math.trunc(position) : 99,
+    });
+  } catch {
+    return { error: "Não foi possível salvar a mensagem." };
+  }
+  revalidatePath(`/w/${slug}`, "layout");
+  return { ok: id ? "Mensagem salva." : "Mensagem criada." };
+}
+
+export async function deleteTemplate(slug: string, id: string): Promise<{ error?: string }> {
+  const { token, workspace } = await requireWorkspace(slug);
+  if (workspace.role !== "admin") return { error: "Só o administrador altera as mensagens." };
+  try {
+    await call("lh_delete_template", { p_token: token, p_id: id });
+  } catch {
+    return { error: "Não foi possível excluir." };
+  }
+  revalidatePath(`/w/${slug}`, "layout");
+  return {};
+}
+
+export async function pushSubscribe(
+  slug: string,
+  subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+): Promise<{ error?: string }> {
+  const { token } = await requireWorkspace(slug);
+  if (!/^https:\/\//.test(subscription.endpoint)) return { error: "Assinatura inválida." };
+  try {
+    await call("lh_push_subscribe", {
+      p_token: token,
+      p_endpoint: subscription.endpoint,
+      p_p256dh: subscription.keys.p256dh,
+      p_auth: subscription.keys.auth,
+    });
+    return {};
+  } catch {
+    return { error: "Não foi possível ativar os avisos." };
+  }
+}
+
+export async function pushUnsubscribe(slug: string, endpoint: string) {
+  const { token } = await requireWorkspace(slug);
+  await call("lh_push_unsubscribe", { p_token: token, p_endpoint: endpoint }).catch(() => undefined);
 }
 
 /** Admin sessions only (checked again in the database). */
@@ -90,7 +213,7 @@ export async function deleteLeads(slug: string, leadIds: string[]): Promise<{ de
   if (leadIds.length === 0 || leadIds.length > 500) return { error: "Selecione entre 1 e 500 linhas." };
   try {
     const deleted = await call<number>("lh_delete_leads", { p_token: token, p_lead_ids: leadIds });
-    revalidatePath(`/w/${slug}`);
+    revalidatePath(`/w/${slug}`, "layout");
     return { deleted };
   } catch {
     return { error: "Não foi possível excluir." };
@@ -111,6 +234,6 @@ export async function createLead(slug: string, _prev: FormState, formData: FormD
     p_phone: phone ?? "",
     p_notes: String(formData.get("notes") ?? ""),
   });
-  revalidatePath(`/w/${slug}`);
+  revalidatePath(`/w/${slug}`, "layout");
   return { ok: "Lead adicionado." };
 }
