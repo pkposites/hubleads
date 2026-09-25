@@ -22,6 +22,8 @@ const eventSchema = z.object({
   attribution: z.record(z.string(), z.unknown()).optional().nullable(),
   url_params: z.record(z.string(), z.unknown()).optional().nullable(),
   data: z.record(z.string(), z.unknown()).optional().nullable(),
+  // false: the visitor refused tracking (LGPD); only the typed contact is kept.
+  consent: z.boolean().optional().nullable(),
 });
 
 const ATTRIBUTION_KEYS = [
@@ -147,18 +149,19 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
   if (!parsed.success) return json(400, { error: "invalid event" });
 
   const event = parsed.data;
+  const refused = event.consent === false;
   if (event.type === "lp_event") {
     const name = typeof event.data?.event === "string" ? event.data.event : "";
     // Views, scrolls and the like carry no commercial meaning: not stored.
     if (!name.trim() || isNoiseEvent(name)) return json(200, { ok: true, ignored: true });
   }
   const attribution: Record<string, string> = {};
-  for (const key of ATTRIBUTION_KEYS) {
+  for (const key of refused ? [] : ATTRIBUTION_KEYS) {
     const value = event.attribution?.[key];
     if (typeof value === "string" && value.trim()) attribution[key] = value.trim().slice(0, 2000);
   }
 
-  const channel = classifyChannel({ ...attribution, landing_page_url: attribution.landing_url });
+  const channel = refused ? "sem_consentimento" : classifyChannel({ ...attribution, landing_page_url: attribution.landing_url });
   const device = deviceFrom(request.headers.get("user-agent"));
   const host = originHost(request);
 
@@ -176,10 +179,11 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
       channel,
       device,
       attribution,
-      url_params: cleanAnswers(event.url_params),
+      url_params: refused ? {} : cleanAnswers(event.url_params),
       // Kept for Meta's Conversions API (client_ip_address / client_user_agent).
-      ip_address: clientIp(request),
-      user_agent: request.headers.get("user-agent")?.slice(0, 500) || undefined,
+      ip_address: refused ? undefined : clientIp(request),
+      user_agent: refused ? undefined : request.headers.get("user-agent")?.slice(0, 500) || undefined,
+      consent: event.consent ?? undefined,
       data: cleanAnswers(event.data),
     });
     // Logs never carry names, codes or URLs (§15.2).

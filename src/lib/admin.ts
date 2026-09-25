@@ -46,33 +46,41 @@ export async function appOrigin() {
 }
 
 export function snippet(origin: string, page: Pick<Page, "public_key">) {
-  return `<script src="${origin}/tracker.js" data-key="${page.public_key}" async></script>`;
+  return `<script src="${origin}/tracker.js" data-key="${page.public_key}" data-consent="banner" async></script>`;
 }
 
 /** Instructions to paste into the landing page's Claude Code (or hand to its developer). */
 export function installPrompt(origin: string, page: Pick<Page, "public_key">) {
-  return `Quero conectar esta landing page ao Lead Hub, que registra cada contato pelo WhatsApp numa planilha com a origem do anúncio.
+  const policy = `${origin}/privacidade/${page.public_key}`;
+  return `Quero conectar esta landing page ao Lead Hub, que registra cada contato pelo WhatsApp numa planilha com a origem do anúncio, respeitando a LGPD.
 
-1. Adicione este script em todas as páginas, dentro do <head>, logo depois do pixel da Meta. Não altere o pixel nem os scripts atuais de UTMs e eventos:
+1. Adicione este script em todas as páginas, dentro do <head>, logo depois do pixel da Meta. Não altere os scripts atuais de UTMs e eventos:
 
 ${snippet(origin, page)}
 
-2. Em TODOS os botões de contato/WhatsApp, antes de abrir o WhatsApp, mostre um passo curto pedindo:
+   O data-consent="banner" mostra um aviso curto de cookies (Aceitar/Recusar). Sem aceite, nada de navegação é guardado nem enviado.
+   Se a página já tiver um banner de cookies próprio, troque por data-consent="required" e chame window.LeadHub?.consent(true) ao aceitar e window.LeadHub?.consent(false) ao recusar (não mostre os dois banners).
+
+2. LGPD no pixel da Meta e no Google: para que também só rodem depois do aceite, no código do pixel coloque fbq('consent', 'revoke'); ANTES de fbq('init', ...). Se houver Google Tag Manager/gtag, antes dele: gtag('consent', 'default', { ad_storage: 'denied', analytics_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });. O Lead Hub libera os dois quando a pessoa aceita. Não mude mais nada no pixel.
+
+3. Em TODOS os botões de contato/WhatsApp, antes de abrir o WhatsApp, mostre um passo curto pedindo:
    - Nome (obrigatório)
    - WhatsApp com DDD (obrigatório, com máscara (11) 91234-5678)
-   Abaixo do botão, inclua: "Ao continuar, você concorda em ser contatado pelo WhatsApp."
+   Abaixo do botão, inclua: "Ao continuar, você concorda em ser contatado pelo WhatsApp. Veja a Política de privacidade." com o link ${policy}
+   Coloque o mesmo link no rodapé da página.
 
-3. Ao confirmar esse passo:
+4. Ao confirmar esse passo:
      window.LeadHub?.identify({ name: nome, phone: telefone });
    e abra o WhatsApp passando a URL pelo Lead Hub:
      const destino = window.LeadHub ? window.LeadHub.whatsappUrl(url) : url;
    Use "destino" no lugar da URL original, do jeito que a página já abre hoje (link, window.open ou location.href).
 
-4. Se a página tiver quiz ou perguntas, envie as respostas antes de abrir o WhatsApp:
+5. Se a página tiver quiz ou perguntas, envie as respostas antes de abrir o WhatsApp:
      window.LeadHub?.set({ "Pergunta curta": "resposta escolhida" });
    Use rótulos curtos em português como chave (viram colunas na planilha) e o texto da opção como valor.
+   Se alguma pergunta for sobre saúde (sintomas, tratamentos, condições), inclua antes do envio uma caixa de seleção, desmarcada, obrigatória para enviar essas respostas: "Autorizo o uso das minhas respostas sobre saúde somente para o meu atendimento." Sem a marcação, não chame LeadHub.set com essas respostas.
 
-5. Não mexa no pixel da Meta nem na Conversions API. No final, liste os botões alterados e como cada um abre o WhatsApp.
+6. Não mexa na Conversions API. No final, liste os botões alterados, como cada um abre o WhatsApp e onde ficou o link da política.
 
-Para testar: abra a página com ?utm_source=teste, preencha nome e telefone e clique no WhatsApp. A mensagem deve terminar com "(cód. XXXX)" e o contato aparece na planilha do Lead Hub.`;
+Para testar: abra a página com ?utm_source=teste, aceite os cookies, preencha nome e telefone e clique no WhatsApp. A mensagem deve terminar com "(cód. XXXX)" e o contato aparece na planilha do Lead Hub. Em outra janela anônima, recuse os cookies: o contato ainda aparece, mas com a origem "não coletada".`;
 }

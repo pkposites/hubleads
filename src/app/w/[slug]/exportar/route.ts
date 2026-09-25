@@ -31,6 +31,13 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
     if (rows.length >= page.total || page.rows.length === 0) break;
   }
 
+  // Who exported how many rows stays in the audit log (LGPD).
+  await call("lh_log_export", {
+    p_token: session.token,
+    p_rows: rows.length,
+    p_filters: { periodo: period, status: status ?? null, origem: channel ?? null, busca: Boolean(sp.get("q")) },
+  });
+
   const date = new Date().toISOString().slice(0, 10);
   return new Response(leadsToCsv(rows), {
     headers: {

@@ -30,6 +30,8 @@ export interface MetaLead {
   ip_address: string | null;
   user_agent: string | null;
   landing_url: string | null;
+  /** false: the visitor refused tracking on the landing page (LGPD). */
+  tracking_consent?: boolean | null;
 }
 
 export const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -79,6 +81,8 @@ export interface MetaEvent {
 /** Events the lead is due to send, skipping the ones already delivered. */
 export function dueEvents(lead: MetaLead, config: MetaConfig, sent: readonly string[], now = new Date()): MetaEvent[] {
   const events: MetaEvent[] = [];
+  // Nothing about people who refused tracking goes to Meta.
+  if (lead.tracking_consent === false) return events;
   const value = lead.sale_value === null || lead.sale_value === "" ? null : Number(lead.sale_value);
   const wanted: { name: string; custom?: Record<string, unknown> }[] = [];
   if (lead.status === "agendado" && config.send_schedule) wanted.push({ name: META_EVENTS.agendado });

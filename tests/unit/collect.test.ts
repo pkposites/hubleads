@@ -44,6 +44,18 @@ const post = (body: unknown, headers: Record<string, string> = {}) =>
   });
 
 describe("POST /api/collect", () => {
+  it("keeps only the typed contact when the visitor refused tracking", async () => {
+    const d = deps();
+    await handleCollect(
+      post({ ...event, consent: false, phone: "11 91234-5678", url_params: { utm_source: "facebook" } }, { "X-Real-IP": "200.1.2.3" }),
+      d,
+    );
+    const forwarded = (d.collect as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    expect(forwarded).toMatchObject({ consent: false, channel: "sem_consentimento", name: "Maria", phone: "+5511912345678", attribution: {}, url_params: {} });
+    expect(forwarded.ip_address).toBeUndefined();
+    expect(forwarded.user_agent).toBeUndefined();
+  });
+
   it("drops page events with no commercial meaning", async () => {
     const d = deps();
     const res = await handleCollect(post({ ...event, type: "lp_event", data: { event: "PageView" } }), d);

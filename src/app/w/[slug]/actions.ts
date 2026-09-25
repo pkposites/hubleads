@@ -10,6 +10,7 @@ import { fromLocalInput } from "@/lib/format";
 import type { LpEvent } from "@/lib/lp-events";
 import { isStatus, parseMoney, type HistoryEntry, type Lead, type Status, type Template } from "@/lib/leads";
 import { normalizePhone } from "@/lib/normalize";
+import { loginClient, lockedMessage } from "@/lib/server";
 import { requireWorkspace, SESSION_COOKIE } from "@/lib/session";
 
 export type FormState = { error?: string; ok?: string; slug?: string } | undefined;
@@ -19,9 +20,14 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
   const password = String(formData.get("password") ?? "");
   if (!slug || !password) return { error: "Informe a empresa e a senha." };
 
-  const result = await call<{ token: string; slug: string } | null>("lh_login", { p_slug: slug, p_password: password });
+  const result = await call<{ token?: string; slug?: string; locked?: boolean; retry_after?: number } | null>("lh_login", {
+    p_slug: slug,
+    p_password: password,
+    p_client: await loginClient(),
+  });
   // Returned so the form keeps the company after a failed attempt.
   if (!result) return { error: "Empresa ou senha incorretos.", slug };
+  if (result.locked || !result.token) return { error: lockedMessage(result.retry_after ?? 900), slug };
 
   (await cookies()).set(SESSION_COOKIE, result.token, {
     httpOnly: true,

@@ -67,6 +67,7 @@ export interface CollectEvent {
   ip_address?: string;
   user_agent?: string;
   data?: Record<string, unknown>;
+  consent?: boolean;
 }
 
 export const collect = (pool: Pool, key: string, event: CollectEvent, host = "clinica.com.br") =>

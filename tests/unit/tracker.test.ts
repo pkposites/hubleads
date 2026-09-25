@@ -175,6 +175,98 @@ describe("tracker.js", () => {
     expect(sent.at(-1)?.data).toEqual({ event: "form_step", source: "api" });
   });
 
+  describe("consent (LGPD)", () => {
+    beforeEach(() => {
+      delete (window as { fbq?: unknown }).fbq;
+      delete (window as { gtag?: unknown }).gtag;
+      delete (window as { lhConsent?: unknown }).lhConsent;
+    });
+    const banner = () => document.querySelector("[data-leadhub-consent]");
+    const button = (label: string) =>
+      [...(banner()?.querySelectorAll("button") ?? [])].find((b) => b.textContent === label) as HTMLButtonElement;
+
+    it("tracks nothing before the visitor answers, but still records the contact on a WhatsApp click", async () => {
+      const { sent, flush } = load("/?utm_source=facebook&fbclid=IwAR1", { attrs: { "data-consent": "banner" } });
+      await flush();
+      expect(sent).toEqual([]);
+      expect(banner()?.textContent).toContain("Política de privacidade");
+      expect(banner()?.querySelector("a")?.getAttribute("href")).toBe("https://leadhub.test/privacidade/pk_test");
+      expect(localStorage.getItem("lh_vid")).toBeNull();
+
+      const input = document.createElement("input");
+      input.name = "nome";
+      input.value = "Ana";
+      document.body.appendChild(input);
+      whatsappLink("https://wa.me/5511999999999").click();
+      await flush();
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({ type: "whatsapp_click", consent: false, name: "Ana" });
+      expect(sent[0]).not.toHaveProperty("attribution");
+      expect(sent[0]).not.toHaveProperty("url_params");
+      expect(Object.keys(localStorage).filter((k) => k.startsWith("lh_"))).toEqual([]);
+    });
+
+    it("starts tracking when the visitor accepts, and releases the pixel and Google tags", async () => {
+      const fbq = vi.fn();
+      const gtag = vi.fn();
+      Object.assign(window, { fbq, gtag });
+      const { sent, flush } = load("/?utm_source=facebook&fbclid=IwAR1", { attrs: { "data-consent": "banner" } });
+      button("Aceitar").click();
+      await flush();
+      expect(banner()).toBeNull();
+      expect(localStorage.getItem("lh_consent")).toBe("granted");
+      expect(fbq).toHaveBeenCalledWith("consent", "grant");
+      expect(gtag).toHaveBeenCalledWith("consent", "update", expect.objectContaining({ ad_storage: "granted" }));
+      expect(sent[0]).toMatchObject({ type: "page_view", consent: true, attribution: { utm_source: "facebook" } });
+      expect(localStorage.getItem("lh_vid")).toBeTruthy();
+
+      // Next visit: no banner, tracking right away.
+      const again = load("/", { attrs: { "data-consent": "banner" } });
+      await again.flush();
+      expect(banner()).toBeNull();
+      expect(again.sent[0]).toMatchObject({ type: "page_view", consent: true });
+    });
+
+    it("remembers a refusal and erases what was stored", async () => {
+      const fbq = vi.fn();
+      Object.assign(window, { fbq });
+      localStorage.setItem("lh_vid", "antigo123456");
+      const { sent, flush } = load("/", { attrs: { "data-consent": "banner" } });
+      button("Recusar").click();
+      await flush();
+      expect(fbq).toHaveBeenCalledWith("consent", "revoke");
+      expect(localStorage.getItem("lh_consent")).toBe("denied");
+      expect(localStorage.getItem("lh_vid")).toBeNull();
+      expect(sent).toEqual([]);
+
+      const again = load("/", { attrs: { "data-consent": "banner" } });
+      await again.flush();
+      expect(banner()).toBeNull();
+      expect(again.sent).toEqual([]);
+    });
+
+    it("follows the page's own cookie banner in required mode", async () => {
+      const { sent, flush } = load("/", { attrs: { "data-consent": "required" } });
+      await flush();
+      expect(banner()).toBeNull();
+      expect(sent).toEqual([]);
+      const api = (window as unknown as { LeadHub: { consent(v: boolean): void; consentStatus(): string } }).LeadHub;
+      expect(api.consentStatus()).toBe("pending");
+      api.consent(true);
+      await flush();
+      expect(api.consentStatus()).toBe("granted");
+      expect(sent.map((e) => e.type)).toEqual(["page_view"]);
+    });
+
+    it("keeps the original behaviour on pages without the option", async () => {
+      const { sent, flush } = load("/");
+      await flush();
+      expect(sent[0].type).toBe("page_view");
+      expect(sent[0]).not.toHaveProperty("consent");
+      expect(banner()).toBeNull();
+    });
+  });
+
   describe("events the page already fires", () => {
     type Observer = (list: { getEntries(): { name: string }[] }) => void;
     let observers: Observer[] = [];

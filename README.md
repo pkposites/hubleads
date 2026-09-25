@@ -54,6 +54,19 @@ quantas delas clicaram no WhatsApp e compraram.
 Regras de instalação em outras LPs: [docs/INSTALACAO-LP.md](docs/INSTALACAO-LP.md).
 Segurança e LGPD (feito e pendente): [docs/SEGURANCA-LGPD.md](docs/SEGURANCA-LGPD.md).
 
+## LGPD
+
+- Código da LP com `data-consent="banner"`: aviso de cookies (Aceitar/Recusar);
+  sem aceite, nada fica no aparelho e só o contato digitado é registrado.
+- Política de privacidade pública por cliente em `/privacidade/<cliente>`,
+  preenchida no painel mãe (cartão Privacidade).
+- Prazo de guarda automático (função agendada `netlify/functions/retention.mts`),
+  exportação dos dados de um lead para o titular e registro de exportações e
+  exclusões.
+- Login com limite de tentativas.
+
+Detalhes e pendências em [docs/SEGURANCA-LGPD.md](docs/SEGURANCA-LGPD.md).
+
 ## Acesso
 
 - **Painel mãe** (`/admin`): o administrador cria clientes e Landing Pages,

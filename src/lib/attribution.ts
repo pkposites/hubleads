@@ -14,6 +14,7 @@ export const CHANNELS = {
   referral: "Referral",
   direct: "Direct",
   whatsapp_direto: "WhatsApp direto",
+  sem_consentimento: "Origem não coletada (sem consentimento)",
 } as const;
 
 export type Channel = keyof typeof CHANNELS;

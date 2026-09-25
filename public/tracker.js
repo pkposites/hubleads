@@ -20,6 +20,14 @@
  * Also records the commercial events the page already fires through the Meta
  * pixel or Google Tag Manager (Lead, Contact, Schedule, Purchase...), without
  * touching them. Page views, scrolls and similar events are ignored.
+ *
+ * Consent (LGPD), with data-consent on the script tag:
+ *   data-consent="banner"   -> shows a short consent banner (Aceitar/Recusar)
+ *   data-consent="required" -> waits for LeadHub.consent(true|false) from the
+ *                              page's own cookie banner
+ * Until the visitor accepts, nothing is stored on the device and no visit or
+ * origin is sent: a WhatsApp click sends only the contact the person typed.
+ * Accepting also calls fbq('consent', 'grant') and gtag consent "granted".
  */
 (function () {
   "use strict";
@@ -42,21 +50,51 @@
   var CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   var WHATSAPP_RE = /^(https?:\/\/(wa\.me|(api|web|www)\.whatsapp\.com)\/|whatsapp:\/\/)/i;
   var ATTR_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+  var CONSENT_MODE = script.getAttribute("data-consent"); // "banner" | "required" | null
+  var PRIVACY_URL =
+    script.getAttribute("data-privacy-url") || new URL("/privacidade/" + encodeURIComponent(KEY || ""), script.src).toString();
+  var STORED_KEYS = ["lh_vid", "lh_attr", "lh_code", "lh_code_enabled"];
+
+  // The visitor's choice is the one thing kept before consent (it is needed
+  // to remember the answer).
+  function storedChoice() {
+    try {
+      return window.localStorage.getItem("lh_consent");
+    } catch (e) {
+      return null;
+    }
+  }
+  var choice = CONSENT_MODE ? storedChoice() : null;
+  if (CONSENT_MODE && !choice && typeof window.lhConsent === "boolean") choice = window.lhConsent ? "granted" : "denied";
+  // Pages without the consent option keep the original behaviour.
+  var tracking = !CONSENT_MODE || choice === "granted";
 
   // --- storage (never throws: private mode, blocked storage...) ------------
+  // Without consent everything stays in memory, for this page only.
   var memory = {};
   function get(name) {
-    try {
-      var v = window.localStorage.getItem(name);
-      if (v !== null) return v;
-    } catch (e) {}
+    if (tracking) {
+      try {
+        var v = window.localStorage.getItem(name);
+        if (v !== null) return v;
+      } catch (e) {}
+    }
     return memory[name] || null;
   }
   function set(name, value) {
     memory[name] = value;
+    if (!tracking) return;
     try {
       window.localStorage.setItem(name, value);
     } catch (e) {}
+  }
+  function session(name, value) {
+    if (!tracking) return value === undefined ? null : undefined;
+    try {
+      if (value === undefined) return window.sessionStorage.getItem(name);
+      window.sessionStorage.setItem(name, value);
+    } catch (e) {}
+    return null;
   }
   function cookie(name) {
     var m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
@@ -138,16 +176,20 @@
   }
 
   var urlParams = {};
-  var attribution = readAttribution();
+  var attribution = tracking ? readAttribution() : {};
 
   // --- sending -------------------------------------------------------------
   function send(event) {
+    if (!tracking && event.type !== "whatsapp_click" && event.type !== "identify") return;
     event.key = KEY;
     event.visitor_id = visitorId;
     event.url = window.location.href.split("#")[0];
     event.title = document.title;
-    event.attribution = attribution;
-    event.url_params = urlParams;
+    if (tracking) {
+      event.attribution = attribution;
+      event.url_params = urlParams;
+    }
+    if (CONSENT_MODE) event.consent = tracking;
     var body = JSON.stringify(event);
     try {
       // text/plain avoids a CORS preflight; sendBeacon survives navigation.
@@ -188,7 +230,7 @@
   // Contact given through LeadHub.identify (e.g. a name/phone step before WhatsApp).
   var contact = {};
   try {
-    contact = JSON.parse(window.sessionStorage.getItem("lh_contact") || "{}") || {};
+    contact = JSON.parse(session("lh_contact") || "{}") || {};
   } catch (e) {}
 
   function withCode(url) {
@@ -209,7 +251,7 @@
   // end up as columns in the sheet. Kept for the tab's lifetime.
   var answers = {};
   try {
-    answers = JSON.parse(window.sessionStorage.getItem("lh_answers") || "{}") || {};
+    answers = JSON.parse(session("lh_answers") || "{}") || {};
   } catch (e) {}
   function setAnswers(values) {
     if (!values || typeof values !== "object") return;
@@ -218,9 +260,7 @@
       if (v === null || v === undefined || v === "") delete answers[k];
       else answers[k] = Array.isArray(v) ? v.join(", ") : v;
     }
-    try {
-      window.sessionStorage.setItem("lh_answers", JSON.stringify(answers));
-    } catch (e) {}
+    session("lh_answers", JSON.stringify(answers));
   }
 
   var lastClick = 0;
@@ -365,9 +405,7 @@
       if (!info) return;
       if (info.name) contact.name = String(info.name).trim().slice(0, 120);
       if (info.phone) contact.phone = String(info.phone).trim().slice(0, 40);
-      try {
-        window.sessionStorage.setItem("lh_contact", JSON.stringify(contact));
-      } catch (e) {}
+      session("lh_contact", JSON.stringify(contact));
       // Also updates a row created by an earlier click of this visitor.
       if (contact.name || contact.phone) send({ type: "identify", name: contact.name, phone: contact.phone });
     },
@@ -377,30 +415,139 @@
   };
   window.LeadHub = api;
 
-  try {
-    if (window.PerformanceObserver) {
-      // buffered: also sees what the pixel sent before this script loaded.
-      new PerformanceObserver(function (list) {
-        if (window.LeadHub !== api) return;
-        list.getEntries().forEach(function (entry) {
-          pixelRequest(entry.name);
-        });
-      }).observe({ type: "resource", buffered: true });
-    }
-  } catch (e) {}
-
-  var polls = 0;
-  (function poll() {
-    if (window.LeadHub !== api) return;
+  // --- tracking (only with consent, or on pages without the option) --------
+  var started = false;
+  function startTracking() {
+    if (started) return;
+    started = true;
     try {
-      readDataLayer();
+      if (window.PerformanceObserver) {
+        // buffered: also sees what the pixel sent before this script loaded.
+        new PerformanceObserver(function (list) {
+          if (window.LeadHub !== api) return;
+          list.getEntries().forEach(function (entry) {
+            pixelRequest(entry.name);
+          });
+        }).observe({ type: "resource", buffered: true });
+      }
     } catch (e) {}
-    if (++polls < 1800) setTimeout(poll, 1000);
-  })();
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", pageView);
-  } else {
+    var polls = 0;
+    (function poll() {
+      if (window.LeadHub !== api) return;
+      try {
+        readDataLayer();
+      } catch (e) {}
+      if (++polls < 1800) setTimeout(poll, 1000);
+    })();
+
     pageView();
+  }
+
+  // --- consent (LGPD) ------------------------------------------------------
+  var banner = null;
+  function applyConsent(granted) {
+    if (!CONSENT_MODE) return;
+    choice = granted ? "granted" : "denied";
+    try {
+      window.localStorage.setItem("lh_consent", choice);
+    } catch (e) {}
+    if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+    banner = null;
+    // Pages that start the pixel and Google tags with consent revoked/denied
+    // are released (or kept blocked) together with Lead Hub.
+    var g = granted ? "granted" : "denied";
+    try {
+      if (typeof window.fbq === "function") window.fbq("consent", granted ? "grant" : "revoke");
+    } catch (e) {}
+    try {
+      if (typeof window.gtag === "function") {
+        window.gtag("consent", "update", { ad_storage: g, analytics_storage: g, ad_user_data: g, ad_personalization: g });
+      }
+    } catch (e) {}
+
+    if (granted && !tracking) {
+      tracking = true;
+      // What this page already had in memory may now be kept.
+      for (var k in memory) set(k, memory[k]);
+      session("lh_answers", JSON.stringify(answers));
+      session("lh_contact", JSON.stringify(contact));
+      attribution = readAttribution();
+      startTracking();
+    } else if (!granted) {
+      tracking = false;
+      attribution = {};
+      urlParams = {};
+      STORED_KEYS.forEach(function (name) {
+        try {
+          window.localStorage.removeItem(name);
+        } catch (e) {}
+      });
+      try {
+        window.sessionStorage.removeItem("lh_answers");
+        window.sessionStorage.removeItem("lh_contact");
+      } catch (e) {}
+    }
+  }
+
+  function showBanner() {
+    if (CONSENT_MODE !== "banner" || choice || banner || !document.body) return;
+    banner = document.createElement("div");
+    banner.setAttribute("role", "dialog");
+    banner.setAttribute("aria-label", "Privacidade");
+    banner.setAttribute("data-leadhub-consent", "");
+    banner.style.cssText =
+      "position:fixed;left:12px;right:12px;bottom:12px;max-width:560px;margin:0 auto;z-index:2147483647;" +
+      "background:#18181b;color:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.25);" +
+      "font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;";
+    var text = document.createElement("p");
+    text.style.cssText = "margin:0 0 10px;";
+    text.appendChild(
+      document.createTextNode(
+        "Usamos cookies e dados de navegação para medir nossos anúncios e melhorar o atendimento. Você pode aceitar ou recusar. "
+      )
+    );
+    var link = document.createElement("a");
+    link.href = PRIVACY_URL;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = "Política de privacidade";
+    link.style.cssText = "color:#fff;text-decoration:underline;";
+    text.appendChild(link);
+    banner.appendChild(text);
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;";
+    [
+      ["Recusar", false, "background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);"],
+      ["Aceitar", true, "background:#fff;color:#18181b;border:1px solid #fff;"],
+    ].forEach(function (b) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.textContent = b[0];
+      button.style.cssText = "flex:1;min-height:42px;border-radius:8px;font:600 14px system-ui,sans-serif;cursor:pointer;" + b[2];
+      button.addEventListener("click", function () {
+        applyConsent(b[1]);
+      });
+      row.appendChild(button);
+    });
+    banner.appendChild(row);
+    document.body.appendChild(banner);
+  }
+
+  api.consent = function (granted) {
+    applyConsent(!!granted);
+  };
+  api.consentStatus = function () {
+    return CONSENT_MODE ? choice || "pending" : "not_required";
+  };
+
+  function ready() {
+    if (tracking) startTracking();
+    else showBanner();
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ready);
+  } else {
+    ready();
   }
 })();

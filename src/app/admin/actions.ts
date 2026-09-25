@@ -7,7 +7,7 @@ import { appOrigin, requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib
 import { clientIp } from "@/lib/collect";
 import { sendTestConversion } from "@/lib/conversions";
 import { encryptSecret } from "@/lib/crypto";
-import { encryptionKey } from "@/lib/server";
+import { encryptionKey, lockedMessage, loginClient } from "@/lib/server";
 import { call, DbError } from "@/lib/db";
 import { normalizeDomain } from "@/lib/domains";
 import { slugify } from "@/lib/format";
@@ -34,12 +34,14 @@ function parseDomains(raw: FormDataEntryValue | null): string[] | "invalid" {
 
 export async function adminLogin(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
   const login = String(formData.get("login") ?? "");
-  const result = await call<{ token: string } | null>("lh_admin_login", {
+  const result = await call<{ token?: string; locked?: boolean; retry_after?: number } | null>("lh_admin_login", {
     p_login: login,
     p_password: String(formData.get("password") ?? ""),
+    p_client: await loginClient(),
   });
   // Returned so the form keeps the e-mail after a failed attempt.
   if (!result) return { error: "E-mail ou senha incorretos.", login };
+  if (result.locked || !result.token) return { error: lockedMessage(result.retry_after ?? 900), login };
   (await cookies()).set(ADMIN_COOKIE, result.token, cookieOptions(60 * 60 * 24 * 7));
   redirect("/admin");
 }
@@ -179,4 +181,26 @@ export async function sendMetaTest(workspaceId: string): Promise<{ ok: boolean; 
     ok: result.ok,
     message: result.ok ? "Evento de teste enviado. Confira em Testar eventos no Gerenciador de Eventos." : `Falhou: ${result.response}`,
   };
+}
+
+export async function savePrivacySettings(workspaceId: string, _prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  const { token } = await requireAdmin();
+  const email = String(formData.get("email") ?? "").trim();
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "E-mail inválido." };
+  const months = Number(formData.get("retention_months") ?? 24);
+  if (!Number.isInteger(months) || months < 1 || months > 120) return { error: "Prazo de guarda entre 1 e 120 meses." };
+  try {
+    await call("lh_admin_set_privacy", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_controller: String(formData.get("controller") ?? ""),
+      p_document: String(formData.get("document") ?? ""),
+      p_email: email,
+      p_retention_months: months,
+    });
+  } catch {
+    return { error: "Não foi possível salvar." };
+  }
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+  return { ok: "Salvo." };
 }

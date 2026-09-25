@@ -426,7 +426,7 @@ export function EventChips({ events, max = 4 }: { events?: string[]; max?: numbe
 }
 
 export function HistoryButton({ lead, className = "" }: { lead: Lead; className?: string }) {
-  const { slug } = usePanel();
+  const { slug, isAdmin } = usePanel();
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [lpEvents, setLpEvents] = useState<LpEvent[]>([]);
@@ -476,6 +476,14 @@ export function HistoryButton({ lead, className = "" }: { lead: Lead; className?
                 ))}
               </ul>
             </div>
+          )}
+          {isAdmin && (
+            <p className="mb-3 text-sm">
+              <a href={`/w/${slug}/dados/${lead.id}`} className="font-medium underline">
+                Exportar dados deste lead (pedido LGPD)
+              </a>
+              <span className="block text-xs text-zinc-500">Arquivo com tudo o que o Lead Hub guarda sobre a pessoa. Fica registrado.</span>
+            </p>
           )}
           {pending && !history && <p className="text-sm text-zinc-500">Carregando...</p>}
           {error && <p className="text-sm text-red-700">{error}</p>}

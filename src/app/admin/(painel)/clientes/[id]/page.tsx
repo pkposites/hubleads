@@ -11,6 +11,8 @@ import { openClientSheet } from "../../../actions";
 import { encryptionKey, serverSecret } from "@/lib/server";
 import { AddPageForm, PageSettings, ResetPassword } from "./client-actions";
 import { MetaSettings, type MetaSettingsData } from "./meta-settings";
+import { PrivacySettings } from "./privacy-settings";
+import type { PrivacySettings as PrivacyData } from "@/lib/privacy";
 
 const TYPE_LABEL: Record<string, string> = {
   page_view: "Visita",
@@ -38,10 +40,11 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
     if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) notFound();
     throw error;
   }
-  const [events, meta, pixels] = await Promise.all([
+  const [events, meta, pixels, privacy] = await Promise.all([
     call<LeadEvent[]>("lh_admin_list_events", { p_token: token, p_workspace_id: id, p_limit: 50 }),
     call<MetaSettingsData>("lh_admin_get_meta", { p_token: token, p_workspace_id: id }),
     call<{ pixel_id: string; last_seen: string }[]>("lh_admin_lp_pixels", { p_token: token, p_workspace_id: id }),
+    call<PrivacyData>("lh_admin_get_privacy", { p_token: token, p_workspace_id: id }),
   ]);
   const origin = await appOrigin();
 
@@ -94,6 +97,10 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
           </div>
         </Card>
       ))}
+
+      <Card title="Privacidade (LGPD)">
+        <PrivacySettings workspaceId={client.id} data={privacy} policyUrl={`${origin}/privacidade/${client.slug}`} />
+      </Card>
 
       <Card title="Conversões para a Meta (API de Conversões)">
         <MetaSettings workspaceId={client.id} data={meta} pixels={pixels.map((p) => p.pixel_id)} serverReady={{ secret: Boolean(serverSecret()), key: Boolean(encryptionKey()) }} />

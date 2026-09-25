@@ -44,6 +44,16 @@
 - **Pixel certo**: o painel mãe mostra o ID do pixel que a LP usa e avisa se o
   pixel salvo para a API de Conversões for outro.
 - **Não remover o "(cód. XXXX)"** da mensagem: é o que liga a conversa à linha.
-- **LGPD** (ver `SEGURANCA-LGPD.md`): banner de consentimento antes de carregar
-  pixel e Lead Hub; consentimento específico e destacado se o quiz perguntar
-  sobre saúde.
+- **LGPD** (ver `SEGURANCA-LGPD.md`):
+  - o código já vem com `data-consent="banner"`: mostra o aviso de cookies
+    (Aceitar/Recusar) e só rastreia depois do aceite. Se a LP já tem um banner
+    próprio, use `data-consent="required"` e chame
+    `LeadHub.consent(true|false)` nele;
+  - no pixel da Meta, `fbq('consent', 'revoke');` antes do `fbq('init')`; no
+    Google, `gtag('consent', 'default', {... 'denied'})`. O Lead Hub libera os
+    dois no aceite;
+  - link para a política do cliente (`/privacidade/<chave da LP>`) junto ao
+    formulário e no rodapé;
+  - perguntas de saúde no quiz: caixa de consentimento específico, desmarcada;
+  - quem recusa ainda vira linha na planilha (só com o contato digitado, sem
+    origem) e nunca é enviado para a Meta.

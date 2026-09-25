@@ -65,6 +65,11 @@ describe("Meta conversions", () => {
     expect(dueEvents(lead({ status: "perdido", sale_value: 10 }), config, [])).toEqual([]);
   });
 
+  it("sends nothing for visitors who refused tracking", () => {
+    expect(dueEvents(lead({ tracking_consent: false }), config, [])).toEqual([]);
+    expect(dueEvents(lead({ tracking_consent: true }), config, [])).toHaveLength(1);
+  });
+
   it("reports hand-typed leads as chat conversions", () => {
     const [event] = dueEvents(lead({ user_agent: null, landing_url: null, fbc: null, fbp: null }), config, []);
     expect(event.action_source).toBe("chat");
