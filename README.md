@@ -204,6 +204,11 @@ select lh_private.set_server_secret('<mesmo valor de LH_SERVER_SECRET>');
   `npx web-push generate-vapid-keys`) e, opcional, `META_GRAPH_VERSION`.
   Sem o segredo ou as chaves VAPID, avisos e envio à Meta ficam desligados e o
   resto funciona normalmente.
+- `LH_SERVER_SECRET`, `LH_ENCRYPTION_KEY` e `VAPID_PRIVATE_KEY` são variáveis
+  secretas: no Netlify, grave-as com o contexto **Production** (o Netlify não
+  guarda variável secreta no contexto "todos") e publique de novo depois de
+  criar ou trocar qualquer uma delas. O painel mãe avisa, no cartão da Meta,
+  quando o servidor não as encontra.
 
 ## Desenvolvimento
 
