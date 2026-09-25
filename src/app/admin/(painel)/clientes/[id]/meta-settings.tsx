@@ -16,7 +16,7 @@ export interface MetaSettingsData {
   recent: { event: string; ok: boolean; test: boolean; at: string; response: string | null }[];
 }
 
-export function MetaSettings({ workspaceId, data, serverReady }: { workspaceId: string; data: MetaSettingsData; serverReady: boolean }) {
+export function MetaSettings({ workspaceId, data, serverReady }: { workspaceId: string; data: MetaSettingsData; serverReady: { secret: boolean; key: boolean } }) {
   const [state, action, pending] = useActionState(saveMetaSettings.bind(null, workspaceId), undefined);
   const [testing, startTest] = useTransition();
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
@@ -28,11 +28,15 @@ export function MetaSettings({ workspaceId, data, serverReady }: { workspaceId: 
         <strong>Venda</strong> com valor, envia <code>Purchase</code> com o valor. Cada evento vai uma vez por lead, com telefone e nome
         criptografados (SHA-256), fbc, fbp, IP e navegador do clique, para a Meta atribuir ao anúncio.
       </p>
-      {!serverReady && (
+      {(!serverReady.secret || !serverReady.key) && (
         <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          O servidor ainda não tem a variável LH_SERVER_SECRET: os eventos não serão enviados até ela ser configurada.
+          O servidor ainda não tem {[!serverReady.secret && "LH_SERVER_SECRET", !serverReady.key && "LH_ENCRYPTION_KEY"].filter(Boolean).join(" e ")}:
+          o token não pode ser salvo e os eventos não serão enviados até isso ser configurado.
         </p>
       )}
+      <p className="text-xs text-zinc-500">
+        O token é criptografado (AES-256) antes de ir para o banco e nunca volta para a tela: aparecem só os 4 últimos caracteres.
+      </p>
       <form action={action} className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="ID do pixel (conjunto de dados)">

@@ -45,6 +45,9 @@ LeadHub.identify({ name: "Maria", phone: "(11) 91234-5678" }); // contato pedido
 LeadHub.track("quiz_concluido", { etapa: 3 });                // qualquer outro evento
 ```
 
+Regras de instalação em outras LPs: [docs/INSTALACAO-LP.md](docs/INSTALACAO-LP.md).
+Segurança e LGPD (feito e pendente): [docs/SEGURANCA-LGPD.md](docs/SEGURANCA-LGPD.md).
+
 ## Acesso
 
 - **Painel mãe** (`/admin`): o administrador cria clientes e Landing Pages,
@@ -84,8 +87,10 @@ LeadHub.track("quiz_concluido", { etapa: 3 });                // qualquer outro 
 ## Conversões para a Meta
 
 No painel mãe, em cada cliente, **Conversões para a Meta** guarda o ID do
-pixel e o token da API de Conversões (o token nunca volta para o navegador;
-só aparecem os 4 últimos caracteres). Com o envio ligado:
+pixel e o token da API de Conversões. O token é criptografado (AES-256-GCM)
+pelo servidor antes de ir para o banco, com a chave `LH_ENCRYPTION_KEY`, que
+existe só no Netlify; o banco recusa tokens não cifrados e o painel mostra só
+os 4 últimos caracteres. Com o envio ligado:
 
 - Agendado → evento `Schedule`;
 - Venda com valor → evento `Purchase` com o valor em BRL.
@@ -164,6 +169,8 @@ select lh_private.set_server_secret('<mesmo valor de LH_SERVER_SECRET>');
 - Variáveis no Netlify: `NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL`,
   `LH_SERVER_SECRET` (32+ caracteres, o mesmo do banco),
+  `LH_ENCRYPTION_KEY` (32 bytes aleatórios em base64url; trocar a chave obriga
+  a salvar de novo o token da Meta),
   `NEXT_PUBLIC_VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` (gerar com
   `npx web-push generate-vapid-keys`) e, opcional, `META_GRAPH_VERSION`.
   Sem o segredo ou as chaves VAPID, avisos e envio à Meta ficam desligados e o

@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { anon, collect, createPool, setupAdmin, setupWorkspace, type Setup } from "./harness";
 
 const SECRET = "test-server-secret-0123456789abcdef";
+// Shape of what src/lib/crypto.ts produces; the database never sees the key.
+const CIPHER = "enc:v1:aXZpdml2aXZpdml2.dGFndGFndGFn.Y2lwaGVydGV4dA";
 
 interface History {
   type: string;
@@ -151,29 +153,31 @@ describe("attendance tools", () => {
     const id = (await collect(pool, other.key, { type: "whatsapp_click", visitor_id: "capi-1" })).lead_id!;
 
     expect(await anon(pool, "select lh_server_meta_payload($1, $2) as r", [SECRET, id])).toBeNull();
-    await expect(
-      anon(pool, "select lh_admin_set_meta($1, $2, '123456789', '', null, true, true, true) as r", [admin.token, other.workspaceId]),
-    ).rejects.toMatchObject({ code: "22023" });
-    await anon(pool, "select lh_admin_set_meta($1, $2, '123456789', 'EAAtokensecretoXYZ9', 'TEST1', true, true, true) as r", [
-      admin.token,
-      other.workspaceId,
-    ]);
-    // Blank token keeps the saved one.
-    await anon(pool, "select lh_admin_set_meta($1, $2, '123456789', '', null, true, true, false) as r", [
-      admin.token,
-      other.workspaceId,
-    ]);
+    const setMeta = (token: string, hint: string, sendPurchase = true) =>
+      anon(pool, "select lh_admin_set_meta($1, $2, '123456789', $3, $4, null, true, true, $5) as r", [
+        admin.token,
+        other.workspaceId,
+        token,
+        hint,
+        sendPurchase,
+      ]);
+    await expect(setMeta("", "")).rejects.toMatchObject({ code: "22023" });
+    // A plain token can never be stored, only the server's ciphertext.
+    await expect(setMeta("EAAtokensecretoXYZ9", "XYZ9")).rejects.toMatchObject({ code: "23514" });
+    await setMeta(CIPHER, "XYZ9");
+    // Blank token keeps the saved one (and its hint).
+    await setMeta("", "", false);
 
     const shown = await anon<Record<string, unknown>>(pool, "select lh_admin_get_meta($1, $2) as r", [admin.token, other.workspaceId]);
     expect(shown).toMatchObject({ configured: true, token_hint: "••••XYZ9", send_purchase: false, test_event_code: null });
-    expect(JSON.stringify(shown)).not.toContain("EAAtoken");
+    expect(JSON.stringify(shown)).not.toContain("enc:v1:");
 
     const payload = await anon<{ config: { access_token: string }; lead: { id: string }; sent: string[] }>(
       pool,
       "select lh_server_meta_payload($1, $2) as r",
       [SECRET, id],
     );
-    expect(payload.config.access_token).toBe("EAAtokensecretoXYZ9");
+    expect(payload.config.access_token).toBe(CIPHER);
     expect(payload.sent).toEqual([]);
 
     await anon(pool, "select lh_server_meta_log($1, $2, $3, 'Schedule', 'ev1', true, false, '{}') as r", [

@@ -1,7 +1,19 @@
 import "server-only";
+import { decryptSecret } from "@/lib/crypto";
 import { call } from "@/lib/db";
 import { dueEvents, sendMetaEvent, sha256, type MetaConfig, type MetaEvent, type MetaLead } from "@/lib/meta";
-import { serverSecret } from "@/lib/server";
+import { encryptionKey, serverSecret } from "@/lib/server";
+
+/** The stored config with its token decrypted, or null when the key is missing or wrong. */
+function withPlainToken<T extends { access_token: string }>(config: T): T | null {
+  const key = encryptionKey();
+  if (!key) return null;
+  try {
+    return { ...config, access_token: decryptSecret(config.access_token, key) };
+  } catch {
+    return null;
+  }
+}
 
 const log = (entry: Record<string, unknown>) => console.log(JSON.stringify({ ts: new Date().toISOString(), job: "meta", ...entry }));
 
@@ -28,8 +40,12 @@ export async function sendLeadConversions(leadId: string) {
       p_lead_id: leadId,
     });
     if (!payload) return;
-    for (const event of dueEvents(payload.lead, payload.config, payload.sent)) {
-      const result = await sendMetaEvent(payload.config, event);
+    const events = dueEvents(payload.lead, payload.config, payload.sent);
+    if (events.length === 0) return;
+    const config = withPlainToken(payload.config);
+    if (!config) return log({ error: "token_key" });
+    for (const event of events) {
+      const result = await sendMetaEvent(config, event);
       await record(secret, payload.lead.workspace_id, leadId, event, Boolean(payload.config.test_event_code), result);
       log({ event: event.event_name, ok: result.ok });
     }
@@ -42,11 +58,13 @@ export async function sendLeadConversions(leadId: string) {
 export async function sendTestConversion(workspaceId: string, context: { ip?: string; userAgent?: string; url: string }) {
   const secret = serverSecret();
   if (!secret) return { ok: false, response: "LH_SERVER_SECRET não configurado no servidor." };
-  const config = await call<(MetaConfig & { workspace_id: string }) | null>("lh_server_meta_config", {
+  const stored = await call<(MetaConfig & { workspace_id: string }) | null>("lh_server_meta_config", {
     p_secret: secret,
     p_workspace_id: workspaceId,
   });
-  if (!config) return { ok: false, response: "Salve o pixel e o token primeiro." };
+  if (!stored) return { ok: false, response: "Salve o pixel e o token primeiro." };
+  const config = withPlainToken(stored);
+  if (!config) return { ok: false, response: "Não foi possível ler o token: confira LH_ENCRYPTION_KEY no servidor e salve o token de novo." };
   if (!config.test_event_code) return { ok: false, response: "Informe o código de teste (Gerenciador de Eventos → Testar eventos)." };
   const event: MetaEvent = {
     event_name: "Lead",

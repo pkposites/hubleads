@@ -7,7 +7,7 @@ import { call, DbError } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 import type { LeadEvent } from "@/lib/leads";
 import { openClientSheet } from "../../../actions";
-import { serverSecret } from "@/lib/server";
+import { encryptionKey, serverSecret } from "@/lib/server";
 import { AddPageForm, PageSettings, ResetPassword } from "./client-actions";
 import { MetaSettings, type MetaSettingsData } from "./meta-settings";
 
@@ -85,7 +85,7 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
       ))}
 
       <Card title="Conversões para a Meta (API de Conversões)">
-        <MetaSettings workspaceId={client.id} data={meta} serverReady={Boolean(serverSecret())} />
+        <MetaSettings workspaceId={client.id} data={meta} serverReady={{ secret: Boolean(serverSecret()), key: Boolean(encryptionKey()) }} />
       </Card>
 
       <Card title="Adicionar outra Landing Page">

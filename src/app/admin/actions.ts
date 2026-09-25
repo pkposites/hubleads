@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { appOrigin, requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
 import { clientIp } from "@/lib/collect";
 import { sendTestConversion } from "@/lib/conversions";
+import { encryptSecret } from "@/lib/crypto";
+import { encryptionKey } from "@/lib/server";
 import { call, DbError } from "@/lib/db";
 import { normalizeDomain } from "@/lib/domains";
 import { slugify } from "@/lib/format";
@@ -138,12 +140,18 @@ export async function saveMetaSettings(workspaceId: string, _prev: AdminFormStat
   const { token } = await requireAdmin();
   const pixelId = String(formData.get("pixel_id") ?? "").trim();
   if (!/^\d{5,30}$/.test(pixelId)) return { error: "ID do pixel (conjunto de dados) inválido: use só os números." };
+  // The token is encrypted here, before it reaches the database.
+  const plainToken = String(formData.get("access_token") ?? "").trim();
+  if (plainToken && !/^[A-Za-z0-9_-]{20,1000}$/.test(plainToken)) return { error: "Token de acesso inválido." };
+  const key = encryptionKey();
+  if (plainToken && !key) return { error: "O servidor ainda não tem a chave LH_ENCRYPTION_KEY; o token não foi salvo." };
   try {
     await call("lh_admin_set_meta", {
       p_token: token,
       p_workspace_id: workspaceId,
       p_pixel_id: pixelId,
-      p_access_token: String(formData.get("access_token") ?? "").trim(),
+      p_access_token: plainToken && key ? encryptSecret(plainToken, key) : "",
+      p_token_hint: plainToken.slice(-4),
       p_test_event_code: String(formData.get("test_event_code") ?? "").trim(),
       p_enabled: formData.get("enabled") === "on",
       p_send_schedule: formData.get("send_schedule") === "on",

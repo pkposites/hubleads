@@ -25,4 +25,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   Server-only functions (`lh_server_*`: push targets, Meta token) also need
   `LH_SERVER_SECRET` (`src/lib/server.ts`); never call them from client code.
 - Never log names, phones, codes or raw payloads.
+- Secrets saved in the database (the Meta token) are encrypted by the app with
+  `encryptSecret` (`src/lib/crypto.ts`, key `LH_ENCRYPTION_KEY`); the database
+  rejects plain values. Security/LGPD status and plan: `docs/SEGURANCA-LGPD.md`.
 - UI copy is in Brazilian Portuguese.
