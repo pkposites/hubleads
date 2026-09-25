@@ -78,28 +78,41 @@ export interface MetaEvent {
   custom_data?: Record<string, unknown>;
 }
 
-/** Events the lead is due to send, skipping the ones already delivered. */
-export function dueEvents(lead: MetaLead, config: MetaConfig, sent: readonly string[], now = new Date()): MetaEvent[] {
+/** Meta refuses events older than this. */
+export const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Events the lead is due to send, skipping the ones already delivered.
+ * statusAt: when the lead entered its current status (the conversion time);
+ * conversions older than 7 days are no longer sent.
+ */
+export function dueEvents(
+  lead: MetaLead,
+  config: MetaConfig,
+  sent: readonly string[],
+  now = new Date(),
+  statusAt: string | null = null,
+): MetaEvent[] {
   const events: MetaEvent[] = [];
   // Nothing about people who refused tracking goes to Meta.
   if (lead.tracking_consent === false) return events;
+  const at = statusAt ? new Date(statusAt) : now;
+  if (Number.isNaN(at.getTime()) || now.getTime() - at.getTime() > MAX_EVENT_AGE_MS) return events;
   const value = lead.sale_value === null || lead.sale_value === "" ? null : Number(lead.sale_value);
   const wanted: { name: string; custom?: Record<string, unknown> }[] = [];
   if (lead.status === "agendado" && config.send_schedule) wanted.push({ name: META_EVENTS.agendado });
   if (lead.status === "venda" && config.send_purchase && value !== null && value > 0) {
     wanted.push({ name: META_EVENTS.venda, custom: { currency: "BRL", value } });
   }
-  // Clicks from the landing page carry the browser data Meta needs for
-  // "website" events; rows typed in by hand are reported as chat conversions.
-  const website = Boolean(lead.user_agent && lead.landing_url);
   for (const w of wanted) {
     if (sent.includes(w.name)) continue;
     events.push({
       event_name: w.name,
-      event_time: Math.floor(now.getTime() / 1000),
+      event_time: Math.floor(Math.min(at.getTime(), now.getTime()) / 1000),
       event_id: `${lead.id}.${w.name}`,
-      action_source: website ? "website" : "chat",
-      ...(website && { event_source_url: lead.landing_url as string }),
+      // The booking and the sale happen in the WhatsApp conversation, not on
+      // the site; the click ids (fbc/fbp) still link them to the ad.
+      action_source: "chat",
       user_data: userData(lead),
       ...(w.custom && { custom_data: w.custom }),
     });

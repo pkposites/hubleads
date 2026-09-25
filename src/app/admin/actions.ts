@@ -3,7 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { appOrigin, requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
+import { requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
 import { clientIp } from "@/lib/collect";
 import { sendTestConversion } from "@/lib/conversions";
 import { encryptSecret } from "@/lib/crypto";
@@ -174,7 +174,6 @@ export async function sendMetaTest(workspaceId: string): Promise<{ ok: boolean; 
   const result = await sendTestConversion(workspaceId, {
     ip: clientIp(request),
     userAgent: h.get("user-agent") ?? undefined,
-    url: await appOrigin(),
   });
   revalidatePath(`/admin/clientes/${workspaceId}`);
   return {

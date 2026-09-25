@@ -115,7 +115,17 @@ os 4 últimos caracteres. Com o envio ligado:
 - Venda com valor → evento `Purchase` com o valor em BRL.
 
 Cada evento vai uma vez por lead (`event_id` = lead + evento), com telefone e
-nome em SHA-256, `fbc`, `fbp`, IP e navegador do clique. Com um código de
+nome em SHA-256, `fbc`, `fbp`, IP e navegador do clique, no horário em que o
+lead foi agendado ou vendido e como conversão feita na conversa
+(`action_source: chat`). Quem recusou os cookies na LP não é enviado.
+
+Se um envio falhar, a função agendada `netlify/functions/meta-retry.mts` tenta
+de novo a cada hora (até 6 vezes por evento, enquanto o resultado tiver menos
+de 7 dias, que é o limite da Meta). Ela também envia o que foi agendado ou
+vendido enquanto a integração estava desligada ou em modo teste. O painel mãe
+mostra as falhas das últimas 24 horas e avisa quando a própria LP também
+dispara `Schedule` ou `Purchase` pelo pixel/GTM, o que faria a Meta contar em
+dobro. Com um código de
 teste, os eventos aparecem só em "Testar eventos" do Gerenciador de Eventos.
 A versão da Graph API pode ser trocada com `META_GRAPH_VERSION` (padrão
 `v24.0`).

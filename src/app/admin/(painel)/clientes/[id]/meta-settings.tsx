@@ -14,6 +14,11 @@ export interface MetaSettingsData {
   send_schedule: boolean;
   send_purchase: boolean;
   recent: { event: string; ok: boolean; test: boolean; at: string; response: string | null }[];
+  failures_24h: number;
+  last_error: string | null;
+  last_ok_at: string | null;
+  /** Schedule/Purchase the landing page also fires through the pixel or GTM. */
+  lp_conflicts: string[];
 }
 
 export function MetaSettings({
@@ -44,6 +49,28 @@ export function MetaSettings({
           O servidor ainda não tem {[!serverReady.secret && "LH_SERVER_SECRET", !serverReady.key && "LH_ENCRYPTION_KEY"].filter(Boolean).join(" e ")}:
           o token não pode ser salvo e os eventos não serão enviados até isso ser configurado.
         </p>
+      )}
+      {data.enabled && data.failures_24h > 0 && (
+        <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          <p className="font-medium">
+            {data.failures_24h} {data.failures_24h === 1 ? "envio falhou" : "envios falharam"} nas últimas 24 horas.
+          </p>
+          <p className="mt-1">
+            O Lead Hub tenta de novo sozinho a cada hora (até 6 vezes por evento, por até 7 dias). Se o erro falar em token (&quot;OAuth&quot;,
+            &quot;access token&quot;), gere um token novo no Gerenciador de Eventos e salve aqui.
+            {data.last_ok_at ? ` Último envio aceito: ${formatDateTime(data.last_ok_at)}.` : ""}
+          </p>
+          {data.last_error && <p className="mt-1 break-all text-xs text-red-700">Último erro: {data.last_error.slice(0, 300)}</p>}
+        </div>
+      )}
+      {data.enabled && data.lp_conflicts.length > 0 && (
+        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="alert">
+          <p className="font-medium">A landing page também envia {data.lp_conflicts.join(" e ")} pelo pixel ou pelo GTM.</p>
+          <p className="mt-1">
+            A Meta contaria o mesmo resultado duas vezes. Mude o nome desse evento na LP (por exemplo, &quot;CliqueAgendar&quot;) ou desligue a
+            opção correspondente abaixo. O evento do Lead Hub é o confiável: só vai quando o atendente confirma.
+          </p>
+        </div>
       )}
       <p className="text-xs text-zinc-500">
         O token é criptografado (AES-256) antes de ir para o banco e nunca volta para a tela: aparecem só os 4 últimos caracteres.

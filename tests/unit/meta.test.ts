@@ -40,9 +40,9 @@ describe("Meta conversions", () => {
       event_name: "Schedule",
       event_id: "lead-1.Schedule",
       event_time: now.getTime() / 1000,
-      action_source: "website",
-      event_source_url: "https://clinica.com.br/lp",
+      action_source: "chat",
     });
+    expect(event).not.toHaveProperty("event_source_url");
     expect(event.user_data).toEqual({
       country: [sha256("br")],
       ph: [sha256("5511912345678")],
@@ -70,10 +70,19 @@ describe("Meta conversions", () => {
     expect(dueEvents(lead({ tracking_consent: true }), config, [])).toHaveLength(1);
   });
 
-  it("reports hand-typed leads as chat conversions", () => {
-    const [event] = dueEvents(lead({ user_agent: null, landing_url: null, fbc: null, fbp: null }), config, []);
+  it("uses the time the lead was booked, and stops after 7 days", () => {
+    const now = new Date("2026-09-25T12:00:00Z");
+    const [event] = dueEvents(lead(), config, [], now, "2026-09-24T15:30:00Z");
+    expect(event.event_time).toBe(Date.parse("2026-09-24T15:30:00Z") / 1000);
+    expect(dueEvents(lead(), config, [], now, "2026-09-17T11:00:00Z")).toEqual([]);
+    // A clock slightly ahead never produces a future event.
+    expect(dueEvents(lead(), config, [], now, "2026-09-25T12:00:30Z")[0].event_time).toBe(now.getTime() / 1000);
+  });
+
+  it("reports conversions as happening in the conversation, keeping the click ids", () => {
+    const [event] = dueEvents(lead({ user_agent: null, landing_url: null }), config, []);
     expect(event.action_source).toBe("chat");
-    expect(event).not.toHaveProperty("event_source_url");
+    expect(event.user_data).toMatchObject({ fbc: "fb.1.1.IwAR", fbp: "fb.1.1.99" });
   });
 
   it("posts to the Graph API with the test code and hides the token in the response", async () => {
