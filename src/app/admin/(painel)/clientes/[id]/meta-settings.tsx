@@ -36,6 +36,8 @@ export function MetaSettings({
   const [state, action, pending] = useActionState(saveMetaSettings.bind(null, workspaceId), undefined);
   const [testing, startTest] = useTransition();
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
+  // Typed but not saved yet: the automatic sending uses only what is saved.
+  const [dirty, setDirty] = useState(false);
 
   return (
     <div className="flex flex-col gap-4">
@@ -81,7 +83,7 @@ export function MetaSettings({
           conjunto de dados e não se juntariam aos cliques do anúncio.
         </p>
       )}
-      <form action={action} className="flex flex-col gap-3">
+      <form action={action} onChange={() => setDirty(true)} onSubmit={() => setDirty(false)} className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field
             label="ID do pixel (conjunto de dados)"
@@ -117,7 +119,11 @@ export function MetaSettings({
             <input type="checkbox" name="send_purchase" defaultChecked={data.send_purchase} /> Venda com valor → Purchase
           </label>
         </div>
-        <FormMessage state={state} />
+        {dirty && !pending ? (
+          <p className="text-sm font-medium text-amber-700">Alterações não salvas: clique em Salvar para valerem.</p>
+        ) : (
+          <FormMessage state={state} />
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" disabled={pending}>
             {pending ? "Salvando..." : "Salvar"}
@@ -127,7 +133,11 @@ export function MetaSettings({
               type="button"
               variant="secondary"
               disabled={testing}
-              onClick={() => startTest(async () => setTest(await sendMetaTest(workspaceId)))}
+              onClick={(e) => {
+                const input = e.currentTarget.form?.elements.namedItem("test_event_code") as HTMLInputElement | null;
+                const code = input?.value ?? "";
+                startTest(async () => setTest(await sendMetaTest(workspaceId, code)));
+              }}
             >
               {testing ? "Enviando..." : "Enviar evento de teste"}
             </Button>

@@ -167,14 +167,17 @@ export async function saveMetaSettings(workspaceId: string, _prev: AdminFormStat
   return { ok: "Salvo." };
 }
 
-export async function sendMetaTest(workspaceId: string): Promise<{ ok: boolean; message: string }> {
+export async function sendMetaTest(workspaceId: string, testCode: string): Promise<{ ok: boolean; message: string }> {
   await requireAdmin();
+  const code = testCode.trim();
+  if (code && !/^[A-Za-z0-9_-]{2,40}$/.test(code)) return { ok: false, message: "Código de teste inválido." };
   const h = await headers();
   const request = new Request("https://x", { headers: h });
-  const result = await sendTestConversion(workspaceId, {
-    ip: clientIp(request),
-    userAgent: h.get("user-agent") ?? undefined,
-  });
+  const result = await sendTestConversion(
+    workspaceId,
+    { ip: clientIp(request), userAgent: h.get("user-agent") ?? undefined },
+    code,
+  );
   revalidatePath(`/admin/clientes/${workspaceId}`);
   return {
     ok: result.ok,

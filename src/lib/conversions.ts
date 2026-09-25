@@ -82,7 +82,8 @@ export async function retryPendingConversions(deadline: number) {
 }
 
 /** Admin "send test event": uses the test code so nothing counts in the ads. */
-export async function sendTestConversion(workspaceId: string, context: { ip?: string; userAgent?: string }) {
+/** testCode: the code typed in the panel, used even before it is saved. */
+export async function sendTestConversion(workspaceId: string, context: { ip?: string; userAgent?: string }, testCode?: string) {
   const secret = serverSecret();
   if (!secret) return { ok: false, response: "LH_SERVER_SECRET não configurado no servidor." };
   const stored = await call<(MetaConfig & { workspace_id: string }) | null>("lh_server_meta_config", {
@@ -90,8 +91,9 @@ export async function sendTestConversion(workspaceId: string, context: { ip?: st
     p_workspace_id: workspaceId,
   });
   if (!stored) return { ok: false, response: "Salve o pixel e o token primeiro." };
-  const config = withPlainToken(stored);
-  if (!config) return { ok: false, response: "Não foi possível ler o token: confira LH_ENCRYPTION_KEY no servidor e salve o token de novo." };
+  const plain = withPlainToken(stored);
+  if (!plain) return { ok: false, response: "Não foi possível ler o token: confira LH_ENCRYPTION_KEY no servidor e salve o token de novo." };
+  const config = { ...plain, test_event_code: testCode?.trim() || plain.test_event_code };
   if (!config.test_event_code) return { ok: false, response: "Informe o código de teste (Gerenciador de Eventos → Testar eventos)." };
   const event: MetaEvent = {
     event_name: "Lead",
