@@ -4,7 +4,9 @@ import { channelLabel } from "@/lib/attribution";
 import { call } from "@/lib/db";
 import { serverSecret } from "@/lib/server";
 
-export const vapidPublicKey = () => process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || null;
+// Read at request time (a literal process.env.NEXT_PUBLIC_* would be fixed at build time).
+const PUBLIC_KEY_VAR = "NEXT_PUBLIC_VAPID_PUBLIC_KEY";
+export const vapidPublicKey = () => process.env[PUBLIC_KEY_VAR] || null;
 
 function configured() {
   const secret = serverSecret();
