@@ -13,6 +13,7 @@ import {
   type Metrics,
   type MetricsRow,
 } from "@/lib/leads";
+import { eventLabel, type LpEventMetric } from "@/lib/lp-events";
 import { requireWorkspace } from "@/lib/session";
 import { PillLinks } from "../period-tabs";
 import { DailyCharts } from "./daily-charts";
@@ -53,9 +54,10 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
   const { token } = await requireWorkspace(slug);
 
   const since = periodStart(period)?.toISOString() ?? null;
-  const [metrics, attendance] = await Promise.all([
+  const [metrics, attendance, lpEvents] = await Promise.all([
     call<Metrics>("lh_metrics", { p_token: token, p_since: since, p_dimension: dimension }),
     call<AttendanceMetrics>("lh_attendance_metrics", { p_token: token, p_since: since }),
+    call<LpEventMetric[]>("lh_lp_event_metrics", { p_token: token, p_since: since }),
   ]);
   const within5 = rate(attendance.within_5_min, attendance.contacted);
   const lostTotal = attendance.lost_reasons.reduce((sum, r) => sum + r.count, 0);
@@ -136,6 +138,44 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
           <p className="mt-4 text-xs text-zinc-500">
             + {t.manual_leads} {t.manual_leads === 1 ? "lead adicionado" : "leads adicionados"} à mão (fora do funil da LP).
           </p>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-5">
+        <div>
+          <h2 className="text-sm font-semibold">Eventos da landing page</h2>
+          <p className="text-xs text-zinc-500">
+            O que a LP registrou pelo pixel da Meta, pelo Google Tag Manager ou pelo Lead Hub. Visualizações de página, rolagem e
+            eventos parecidos ficam de fora.
+          </p>
+        </div>
+        {lpEvents.length === 0 ? (
+          <p className="text-sm text-zinc-500">Nenhum evento comercial registrado neste período.</p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {lpEvents.map((e) => {
+              const share = rate(e.people, t.visitors);
+              return (
+                <li key={e.event} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1">
+                  <span className="text-sm">
+                    {eventLabel(e.event)}
+                    {eventLabel(e.event) !== e.event && <span className="ml-1 text-xs text-zinc-400">{e.event}</span>}
+                  </span>
+                  <span className="text-sm font-semibold tabular-nums">
+                    {e.people} {e.people === 1 ? "pessoa" : "pessoas"}
+                    <span className="font-normal text-zinc-500"> · {formatRate(share)} dos visitantes</span>
+                  </span>
+                  <div className="col-span-2">
+                    <Meter value={share} label={`${eventLabel(e.event)}: parte dos visitantes`} />
+                  </div>
+                  <span className="col-span-2 text-xs text-zinc-500">
+                    {formatRate(rate(e.leads, e.people))} clicaram no WhatsApp · {e.sales} {e.sales === 1 ? "venda" : "vendas"}
+                    {e.events > e.people && ` · ${e.events} disparos`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
 

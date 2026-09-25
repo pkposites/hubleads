@@ -5,7 +5,21 @@ import { formatMinutes, periodStart, rate, formatRate, type AttendanceMetrics, t
 import { requireWorkspace } from "@/lib/session";
 import { LeadCard } from "../lead-sheet";
 
-function Section({ title, hint, leads, waiting = false, tone }: { title: string; hint: string; leads: Lead[]; waiting?: boolean; tone: string }) {
+function Section({
+  title,
+  hint,
+  leads,
+  waiting = false,
+  tone,
+  lpEvents,
+}: {
+  title: string;
+  hint: string;
+  leads: Lead[];
+  waiting?: boolean;
+  tone: string;
+  lpEvents: Record<string, string[]>;
+}) {
   if (leads.length === 0) return null;
   return (
     <section className="flex flex-col gap-2">
@@ -16,7 +30,7 @@ function Section({ title, hint, leads, waiting = false, tone }: { title: string;
       </div>
       <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2 2xl:grid-cols-3">
         {leads.map((lead) => (
-          <LeadCard key={lead.id} lead={lead} waiting={waiting} />
+          <LeadCard key={lead.id} lead={lead} waiting={waiting} lpEvents={lpEvents[lead.id]} />
         ))}
       </ul>
     </section>
@@ -30,6 +44,8 @@ export default async function QueuePage({ params }: PageProps<"/w/[slug]/atender
     call<Queue>("lh_queue", { p_token: token }),
     call<AttendanceMetrics>("lh_attendance_metrics", { p_token: token, p_since: periodStart("hoje")?.toISOString() }),
   ]);
+  const ids = [...queue.waiting, ...queue.overdue, ...queue.today].map((l) => l.id);
+  const lpEvents = ids.length ? await call<Record<string, string[]>>("lh_lead_lp_events", { p_token: token, p_lead_ids: ids }) : {};
   const empty = queue.waiting.length + queue.overdue.length + queue.today.length === 0;
 
   return (
@@ -66,9 +82,10 @@ export default async function QueuePage({ params }: PageProps<"/w/[slug]/atender
             leads={queue.waiting}
             waiting
             tone="bg-red-600 text-white"
+            lpEvents={lpEvents}
           />
-          <Section title="Retornos atrasados" hint="A data do retorno já passou." leads={queue.overdue} tone="bg-red-100 text-red-800" />
-          <Section title="Retornos de hoje" hint="Agendados para mais tarde hoje." leads={queue.today} tone="bg-violet-100 text-violet-800" />
+          <Section title="Retornos atrasados" hint="A data do retorno já passou." leads={queue.overdue} tone="bg-red-100 text-red-800" lpEvents={lpEvents} />
+          <Section title="Retornos de hoje" hint="Agendados para mais tarde hoje." leads={queue.today} tone="bg-violet-100 text-violet-800" lpEvents={lpEvents} />
         </>
       )}
     </div>

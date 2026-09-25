@@ -44,6 +44,10 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
     }),
   ]);
 
+  const lpEvents = list.rows.length
+    ? await call<Record<string, string[]>>("lh_lead_lp_events", { p_token: token, p_lead_ids: list.rows.map((l) => l.id) })
+    : {};
+
   const exportQuery = new URLSearchParams({ periodo: period, ...(status && { status }), ...(channel && { origem: channel }), ...(q && { q }) });
 
   return (
@@ -106,7 +110,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
         </EmptyState>
       ) : (
         <>
-          <LeadSheet leads={list.rows} />
+          <LeadSheet leads={list.rows} lpEvents={lpEvents} />
           <p className="text-xs text-zinc-500">
             {list.total} {list.total === 1 ? "linha" : "linhas"}
             {list.total > list.rows.length && ` (mostrando as ${list.rows.length} mais recentes; exporte para ver todas)`}.

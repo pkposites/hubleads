@@ -171,7 +171,84 @@ describe("tracker.js", () => {
     api.track("form_step", { step: 2 });
     await flush();
     expect(url).toMatch(/c%C3%B3d/);
-    expect(sent.map((e) => e.type)).toEqual(["page_view", "whatsapp_click", "identify", "form_step"]);
+    expect(sent.map((e) => e.type)).toEqual(["page_view", "whatsapp_click", "identify", "lp_event"]);
+    expect(sent.at(-1)?.data).toEqual({ event: "form_step", source: "api" });
+  });
+
+  describe("events the page already fires", () => {
+    type Observer = (list: { getEntries(): { name: string }[] }) => void;
+    let observers: Observer[] = [];
+    beforeEach(() => {
+      observers = [];
+      vi.stubGlobal(
+        "PerformanceObserver",
+        class {
+          constructor(cb: Observer) {
+            observers.push(cb);
+          }
+          observe() {}
+        },
+      );
+      delete (window as { dataLayer?: unknown }).dataLayer;
+    });
+    const pixel = (...urls: string[]) => observers.at(-1)!({ getEntries: () => urls.map((name) => ({ name })) });
+    const events = (sent: Sent[]) => sent.filter((e) => e.type === "lp_event").map((e) => e.data);
+
+    it("reads the Meta pixel's requests without touching the pixel, and skips page views", async () => {
+      const fbq = vi.fn();
+      (window as unknown as { fbq: unknown }).fbq = fbq;
+      const { sent, flush } = load("/");
+      pixel(
+        "https://www.facebook.com/tr/?id=123456789012345&ev=PageView&dl=x",
+        "https://www.facebook.com/tr/?id=123456789012345&ev=Lead&cd[value]=150&cd[currency]=BRL",
+        "https://connect.facebook.net/en_US/fbevents.js",
+        "https://www.facebook.com/tr/?id=123456789012345&ev=ViewContent",
+      );
+      await flush();
+      expect(events(sent)).toEqual([{ event: "Lead", source: "pixel", value: "150", currency: "BRL", pixel_id: "123456789012345" }]);
+      expect((window as unknown as { fbq: unknown }).fbq).toBe(fbq);
+    });
+
+    it("reads Google Tag Manager and gtag events, with Google names shown as Meta's", async () => {
+      // gtag() pushes its `arguments` object, not an array.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      function gtagArgs(..._a: unknown[]) {
+        // eslint-disable-next-line prefer-rest-params
+        return arguments;
+      }
+      const layer: unknown[] = [
+        { event: "gtm.js" },
+        { event: "scroll_depth" },
+        { event: "quiz_concluido", etapa: 3 },
+        gtagArgs("event", "generate_lead", { value: 90, currency: "BRL" }),
+        gtagArgs("config", "G-XYZ"),
+      ];
+      (window as unknown as { dataLayer: unknown[] }).dataLayer = layer;
+      const { sent, flush } = load("/");
+      await flush();
+      expect(events(sent)).toEqual([
+        { event: "quiz_concluido", source: "gtm" },
+        { event: "Lead", source: "gtag", value: 90, currency: "BRL" },
+      ]);
+      expect(layer).toHaveLength(5);
+    });
+
+    it("counts an event sent by both the pixel and GTM once", async () => {
+      (window as unknown as { dataLayer: unknown[] }).dataLayer = [{ event: "Contact" }];
+      const { sent, flush } = load("/");
+      pixel("https://www.facebook.com/tr/?id=1&ev=Contact");
+      await flush();
+      expect(events(sent)).toEqual([{ event: "Contact", source: "gtm" }]);
+    });
+
+    it("keeps reading events pushed later", async () => {
+      const layer: unknown[] = [];
+      (window as unknown as { dataLayer: unknown[] }).dataLayer = layer;
+      const { sent } = load("/");
+      layer.push({ event: "Schedule" });
+      await new Promise((r) => setTimeout(r, 1100));
+      expect(events(sent)).toEqual([{ event: "Schedule", source: "gtm" }]);
+    });
   });
 
   it("sends quiz answers with the click", async () => {

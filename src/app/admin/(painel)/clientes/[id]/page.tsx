@@ -6,6 +6,7 @@ import { channelLabel } from "@/lib/attribution";
 import { call, DbError } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
 import type { LeadEvent } from "@/lib/leads";
+import { eventLabel } from "@/lib/lp-events";
 import { openClientSheet } from "../../../actions";
 import { encryptionKey, serverSecret } from "@/lib/server";
 import { AddPageForm, PageSettings, ResetPassword } from "./client-actions";
@@ -16,6 +17,15 @@ const TYPE_LABEL: Record<string, string> = {
   whatsapp_click: "Clique no WhatsApp",
   identify: "Contato informado",
 };
+
+function eventName(e: LeadEvent) {
+  if (e.type === "lp_event") {
+    const inner = e.data.data as { event?: string; source?: string } | undefined;
+    const source = { pixel: "pixel", gtm: "GTM", gtag: "gtag", api: "Lead Hub" }[inner?.source ?? ""];
+    return `${eventLabel(inner?.event ?? "evento")}${source ? ` (${source})` : ""}`;
+  }
+  return TYPE_LABEL[e.type] ?? eventLabel(e.type);
+}
 
 export default async function ClientPage({ params }: PageProps<"/admin/clientes/[id]">) {
   const { id } = await params;
@@ -28,9 +38,10 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
     if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) notFound();
     throw error;
   }
-  const [events, meta] = await Promise.all([
+  const [events, meta, pixels] = await Promise.all([
     call<LeadEvent[]>("lh_admin_list_events", { p_token: token, p_workspace_id: id, p_limit: 50 }),
     call<MetaSettingsData>("lh_admin_get_meta", { p_token: token, p_workspace_id: id }),
+    call<{ pixel_id: string; last_seen: string }[]>("lh_admin_lp_pixels", { p_token: token, p_workspace_id: id }),
   ]);
   const origin = await appOrigin();
 
@@ -85,7 +96,7 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
       ))}
 
       <Card title="Conversões para a Meta (API de Conversões)">
-        <MetaSettings workspaceId={client.id} data={meta} serverReady={{ secret: Boolean(serverSecret()), key: Boolean(encryptionKey()) }} />
+        <MetaSettings workspaceId={client.id} data={meta} pixels={pixels.map((p) => p.pixel_id)} serverReady={{ secret: Boolean(serverSecret()), key: Boolean(encryptionKey()) }} />
       </Card>
 
       <Card title="Adicionar outra Landing Page">
@@ -111,7 +122,7 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
                 {events.map((e) => (
                   <tr key={e.id}>
                     <td className="whitespace-nowrap px-2 py-1.5 text-xs">{formatDateTime(e.created_at)}</td>
-                    <td className="px-2 py-1.5">{TYPE_LABEL[e.type] ?? e.type}</td>
+                    <td className="px-2 py-1.5">{eventName(e)}</td>
                     <td className="px-2 py-1.5">{channelLabel(e.data.channel)}</td>
                     <td className="px-2 py-1.5 text-xs">{e.data.utm_campaign ?? "—"}</td>
                     <td className="px-2 py-1.5 font-mono text-xs">{e.data.code ?? ""}</td>

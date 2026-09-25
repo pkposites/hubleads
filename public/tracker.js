@@ -15,7 +15,11 @@
  *   LeadHub.whatsappUrl(url, answers?) -> records the click, returns url with code
  *   LeadHub.set({ pergunta: "resposta" }) -> answers (e.g. a quiz) sent with the click
  *   LeadHub.identify({ name, phone })    -> contact typed on the page, sent with the click
- *   LeadHub.track("evento", { ... })     -> records any other event
+ *   LeadHub.track("evento", { value })   -> records any other event
+ *
+ * Also records the commercial events the page already fires through the Meta
+ * pixel or Google Tag Manager (Lead, Contact, Schedule, Purchase...), without
+ * touching them. Page views, scrolls and similar events are ignored.
  */
 (function () {
   "use strict";
@@ -277,7 +281,77 @@
     } catch (e) {}
   }
 
-  window.LeadHub = {
+  // --- events the page already fires (Meta pixel, Google Tag Manager) -----
+  // Read-only: the pixel's own requests are observed and GTM's dataLayer is
+  // read; neither is changed. Views, scrolls and other events with no
+  // commercial meaning are dropped.
+  var NOISE =
+    /^(pageview|page_view|viewcontent|view_content|view_item|view_item_list|view_promotion|view_search_results|scroll|scroll_depth|user_engagement|session_start|first_visit|timer|click|file_download|form_start|video_start|video_progress|video_complete|subscribedbuttonclick|microdata|inputdata|(gtm|gtag|optimize)\..*)$/i;
+  // Google's recommended names shown with Meta's standard names.
+  var GA4_TO_META = {
+    generate_lead: "Lead",
+    sign_up: "CompleteRegistration",
+    begin_checkout: "InitiateCheckout",
+    add_to_cart: "AddToCart",
+    add_payment_info: "AddPaymentInfo",
+    purchase: "Purchase",
+    contact: "Contact",
+    schedule: "Schedule",
+    subscribe: "Subscribe",
+  };
+  var lastEvent = {};
+  var eventCount = 0;
+  function pageEvent(name, source, params) {
+    if (typeof name !== "string") return;
+    name = name.replace(/^\s+|\s+$/g, "").slice(0, 60);
+    if (!name || NOISE.test(name)) return;
+    name = GA4_TO_META[name.toLowerCase()] || name;
+    var now = Date.now();
+    if (lastEvent[name] && now - lastEvent[name] < 3000) return; // same event from pixel and GTM
+    lastEvent[name] = now;
+    if (++eventCount > 40) return;
+    var data = { event: name, source: source };
+    if (params && typeof params === "object") {
+      ["value", "currency", "content_name", "pixel_id"].forEach(function (k) {
+        var v = params[k];
+        if ((typeof v === "string" && v && v.length <= 100) || (typeof v === "number" && isFinite(v))) data[k] = v;
+      });
+    }
+    send({ type: "lp_event", data: data });
+  }
+
+  function pixelRequest(url) {
+    if (typeof url !== "string" || !/^https:\/\/(www\.)?facebook\.com\/tr\/?\?/.test(url)) return;
+    var q;
+    try {
+      q = new URL(url).searchParams;
+    } catch (e) {
+      return;
+    }
+    pageEvent(q.get("ev"), "pixel", {
+      value: q.get("cd[value]"),
+      currency: q.get("cd[currency]"),
+      content_name: q.get("cd[content_name]"),
+      pixel_id: q.get("id"),
+    });
+  }
+
+  var layerIndex = 0;
+  function readDataLayer() {
+    var layer = window.dataLayer;
+    if (!layer || typeof layer.length !== "number") return;
+    for (; layerIndex < layer.length; layerIndex++) {
+      var item = layer[layerIndex];
+      if (!item || typeof item !== "object") continue;
+      if (item[0] === "event" && typeof item[1] === "string") {
+        pageEvent(item[1], "gtag", item[2]); // gtag("event", name, params)
+      } else if (typeof item.event === "string") {
+        pageEvent(item.event, "gtm", item.ecommerce && typeof item.ecommerce === "object" ? item.ecommerce : item);
+      }
+    }
+  }
+
+  var api = {
     __loaded: true,
     visitorId: visitorId,
     whatsappUrl: function (url, values) {
@@ -298,9 +372,31 @@
       if (contact.name || contact.phone) send({ type: "identify", name: contact.name, phone: contact.phone });
     },
     track: function (type, data) {
-      if (typeof type === "string" && type) send({ type: type.slice(0, 40), data: data || {} });
+      pageEvent(type, "api", data);
     },
   };
+  window.LeadHub = api;
+
+  try {
+    if (window.PerformanceObserver) {
+      // buffered: also sees what the pixel sent before this script loaded.
+      new PerformanceObserver(function (list) {
+        if (window.LeadHub !== api) return;
+        list.getEntries().forEach(function (entry) {
+          pixelRequest(entry.name);
+        });
+      }).observe({ type: "resource", buffered: true });
+    }
+  } catch (e) {}
+
+  var polls = 0;
+  (function poll() {
+    if (window.LeadHub !== api) return;
+    try {
+      readDataLayer();
+    } catch (e) {}
+    if (++polls < 1800) setTimeout(poll, 1000);
+  })();
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", pageView);

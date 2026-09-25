@@ -16,7 +16,18 @@ export interface MetaSettingsData {
   recent: { event: string; ok: boolean; test: boolean; at: string; response: string | null }[];
 }
 
-export function MetaSettings({ workspaceId, data, serverReady }: { workspaceId: string; data: MetaSettingsData; serverReady: { secret: boolean; key: boolean } }) {
+export function MetaSettings({
+  workspaceId,
+  data,
+  pixels,
+  serverReady,
+}: {
+  workspaceId: string;
+  data: MetaSettingsData;
+  /** Pixel ids the client's landing pages used in the last 30 days. */
+  pixels: string[];
+  serverReady: { secret: boolean; key: boolean };
+}) {
   const [state, action, pending] = useActionState(saveMetaSettings.bind(null, workspaceId), undefined);
   const [testing, startTest] = useTransition();
   const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
@@ -37,10 +48,26 @@ export function MetaSettings({ workspaceId, data, serverReady }: { workspaceId: 
       <p className="text-xs text-zinc-500">
         O token é criptografado (AES-256) antes de ir para o banco e nunca volta para a tela: aparecem só os 4 últimos caracteres.
       </p>
+      {pixels.length > 0 && data.pixel_id && !pixels.includes(data.pixel_id) && (
+        <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-800">
+          Atenção: a LP usa o pixel {pixels.join(", ")}, diferente do salvo aqui ({data.pixel_id}). As conversões iriam para outro
+          conjunto de dados e não se juntariam aos cliques do anúncio.
+        </p>
+      )}
       <form action={action} className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="ID do pixel (conjunto de dados)">
-            <input name="pixel_id" inputMode="numeric" required defaultValue={data.pixel_id ?? ""} placeholder="123456789012345" className={inputClass} />
+          <Field
+            label="ID do pixel (conjunto de dados)"
+            hint={pixels.length ? `Encontrado na LP: ${pixels.join(", ")}` : "Aparece aqui sozinho quando a LP disparar um evento do pixel."}
+          >
+            <input
+              name="pixel_id"
+              inputMode="numeric"
+              required
+              defaultValue={data.pixel_id ?? pixels[0] ?? ""}
+              placeholder="123456789012345"
+              className={inputClass}
+            />
           </Field>
           <Field
             label="Token de acesso da API de Conversões"

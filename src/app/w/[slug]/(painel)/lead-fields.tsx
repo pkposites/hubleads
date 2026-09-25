@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Button, inputClass } from "@/components/ui";
 import { formatDateTime, formatMoney, formatPhone, formatWhen, localAt, toLocalInput } from "@/lib/format";
 import { fillTemplate, formatMinutes, LOST_REASONS, STATUSES, type HistoryEntry, type Lead, type Status } from "@/lib/leads";
+import { eventLabel, type LpEvent } from "@/lib/lp-events";
 import { whatsappDigits } from "@/lib/normalize";
 import { leadHistory, logContact, setLeadStatus, updateLeadField, type EditableField } from "../actions";
 import { BottomSheet } from "./bottom-sheet";
@@ -396,10 +397,27 @@ export function describeHistory(h: HistoryEntry): string {
   }
 }
 
+/** Commercial events the lead fired on the landing page (pixel, GTM or LeadHub.track). */
+export function EventChips({ events, max = 4 }: { events?: string[]; max?: number }) {
+  if (!events || events.length === 0) return null;
+  const shown = events.slice(0, max);
+  return (
+    <div className="flex flex-wrap gap-1" aria-label="Eventos na landing page">
+      {shown.map((e) => (
+        <span key={e} className="rounded-full bg-[#2a78d6]/10 px-2 py-0.5 text-xs font-medium text-[#1d5aa3]">
+          {eventLabel(e)}
+        </span>
+      ))}
+      {events.length > max && <span className="px-1 text-xs text-zinc-500">+{events.length - max}</span>}
+    </div>
+  );
+}
+
 export function HistoryButton({ lead, className = "" }: { lead: Lead; className?: string }) {
   const { slug } = usePanel();
   const [open, setOpen] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
+  const [lpEvents, setLpEvents] = useState<LpEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -408,6 +426,7 @@ export function HistoryButton({ lead, className = "" }: { lead: Lead; className?
     start(async () => {
       const result = await leadHistory(slug, lead.id);
       setHistory(result.history ?? null);
+      setLpEvents(result.lpEvents ?? []);
       setError(result.error ?? null);
     });
   };
@@ -427,6 +446,24 @@ export function HistoryButton({ lead, className = "" }: { lead: Lead; className?
               </strong>{" "}
               depois do clique.
             </p>
+          )}
+          {lpEvents.length > 0 && (
+            <div className="mb-4">
+              <h3 className="mb-1.5 text-xs font-medium uppercase tracking-wide text-zinc-500">Na landing page</h3>
+              <ul className="flex flex-col gap-1 text-sm">
+                {lpEvents.map((e, i) => (
+                  <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <span>
+                      {eventLabel(e.event)}
+                      {e.value !== null && e.value !== undefined && e.value !== "" && (
+                        <span className="text-zinc-500"> · {formatMoney(Number(e.value))}</span>
+                      )}
+                    </span>
+                    <span className="text-xs text-zinc-500">{formatDateTime(e.at)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           {pending && !history && <p className="text-sm text-zinc-500">Carregando...</p>}
           {error && <p className="text-sm text-red-700">{error}</p>}

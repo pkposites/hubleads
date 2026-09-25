@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { classifyChannel } from "@/lib/attribution";
+import { isNoiseEvent } from "@/lib/lp-events";
 import { normalizePhone } from "@/lib/normalize";
 
 // POST /api/collect: events sent by public/tracker.js. Kept free of Next.js
@@ -146,6 +147,11 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
   if (!parsed.success) return json(400, { error: "invalid event" });
 
   const event = parsed.data;
+  if (event.type === "lp_event") {
+    const name = typeof event.data?.event === "string" ? event.data.event : "";
+    // Views, scrolls and the like carry no commercial meaning: not stored.
+    if (!name.trim() || isNoiseEvent(name)) return json(200, { ok: true, ignored: true });
+  }
   const attribution: Record<string, string> = {};
   for (const key of ATTRIBUTION_KEYS) {
     const value = event.attribution?.[key];

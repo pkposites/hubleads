@@ -6,7 +6,7 @@ import { channelLabel } from "@/lib/attribution";
 import { formatDateTime, timeSince } from "@/lib/format";
 import { adNames, answerEntries, answerLabel, type Lead } from "@/lib/leads";
 import { deleteLeads } from "../actions";
-import { HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StatusCell, TextCell, WaitTimer, WhatsAppButton } from "./lead-fields";
+import { EventChips, HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StatusCell, TextCell, WaitTimer, WhatsAppButton } from "./lead-fields";
 import { usePanel } from "./panel-context";
 
 const path = (url: string | null) => {
@@ -37,6 +37,7 @@ export function LeadCard({
   selected = false,
   onToggle,
   waiting = false,
+  lpEvents,
 }: {
   lead: Lead;
   selectable?: boolean;
@@ -44,6 +45,8 @@ export function LeadCard({
   onToggle?: () => void;
   /** Queue: shows how long the lead has been waiting for a first contact. */
   waiting?: boolean;
+  /** Commercial events fired on the landing page. */
+  lpEvents?: string[];
 }) {
   const names = adNames(lead);
   const answers = answerEntries(lead.extra);
@@ -67,6 +70,11 @@ export function LeadCard({
       </div>
       {waiting && (names.ad || names.campaign) && (
         <p className="mt-1 truncate text-xs text-zinc-500">Anúncio: {names.ad ?? names.campaign}</p>
+      )}
+      {lpEvents && lpEvents.length > 0 && (
+        <div className="mt-1.5">
+          <EventChips events={lpEvents} />
+        </div>
       )}
       <div className="mt-2 flex flex-col gap-1">
         <TextCell lead={lead} field="name" placeholder="Nome" className="w-full" />
@@ -159,7 +167,7 @@ function DeleteDialog({
   );
 }
 
-export function LeadSheet({ leads }: { leads: Lead[] }) {
+export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: Record<string, string[]> }) {
   const { slug, isAdmin: canDelete } = usePanel();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
@@ -218,6 +226,7 @@ export function LeadSheet({ leads }: { leads: Lead[] }) {
           <LeadCard
             key={lead.id}
             lead={lead}
+            lpEvents={lpEvents[lead.id]}
             selectable={canDelete}
             selected={selected.has(lead.id)}
             onToggle={() => toggle(lead.id)}
@@ -225,7 +234,7 @@ export function LeadSheet({ leads }: { leads: Lead[] }) {
         ))}
       </ul>
     <div className="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-white md:block">
-      <table className="w-full min-w-[2200px] border-collapse text-left text-sm">
+      <table className="w-full min-w-[2400px] border-collapse text-left text-sm">
         <thead className="sticky top-0 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
           <tr className="border-b border-zinc-200">
             {canDelete && (
@@ -246,6 +255,7 @@ export function LeadSheet({ leads }: { leads: Lead[] }) {
               "Status",
               "Retorno",
               "Valor",
+              "Eventos na LP",
               "Respostas",
               "Origem",
               "Campanha",
@@ -302,6 +312,9 @@ export function LeadSheet({ leads }: { leads: Lead[] }) {
               </td>
               <td className="px-1 py-0.5">
                 <TextCell lead={lead} field="sale_value" placeholder="R$" display={moneyDisplay} className="w-28" />
+              </td>
+              <td className="min-w-40 max-w-56 px-2 py-1.5">
+                {lpEvents[lead.id]?.length ? <EventChips events={lpEvents[lead.id]} max={6} /> : <span className="text-xs text-zinc-300">—</span>}
               </td>
               <td className="min-w-48 max-w-72 px-2 py-1.5 text-xs">
                 {answerEntries(lead.extra).length === 0 ? (

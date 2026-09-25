@@ -42,8 +42,14 @@ API do script para LPs que montam o link do WhatsApp no próprio código:
 window.open(LeadHub.whatsappUrl("https://wa.me/55119..."));  // registra o clique e inclui o código
 LeadHub.set({ "Tempo de queda": "Mais de 5 anos" });          // respostas (quiz) que vão junto com o clique
 LeadHub.identify({ name: "Maria", phone: "(11) 91234-5678" }); // contato pedido antes do WhatsApp
-LeadHub.track("quiz_concluido", { etapa: 3 });                // qualquer outro evento
+LeadHub.track("quiz_concluido", { value: 150 });              // evento que a LP não manda ao pixel nem ao GTM
 ```
+
+O script também lê sozinho os eventos que a LP já dispara pelo pixel da Meta e
+pelo Google Tag Manager, sem alterar nenhum dos dois, e ignora os sem peso
+comercial (PageView, ViewContent, rolagem...). Cada lead mostra os eventos que
+disparou, e as métricas mostram quantas pessoas dispararam cada evento e
+quantas delas clicaram no WhatsApp e compraram.
 
 Regras de instalação em outras LPs: [docs/INSTALACAO-LP.md](docs/INSTALACAO-LP.md).
 Segurança e LGPD (feito e pendente): [docs/SEGURANCA-LGPD.md](docs/SEGURANCA-LGPD.md).

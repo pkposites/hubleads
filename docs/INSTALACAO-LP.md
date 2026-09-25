@@ -30,6 +30,19 @@
   uma coluna.
 - **Anúncios da Meta** com os parâmetros de URL recomendados no README (nomes
   e IDs de campanha, conjunto e anúncio).
+- **Eventos da LP**: não é preciso configurar nada. O Lead Hub lê sozinho os
+  eventos que a LP já dispara pelo **pixel da Meta** (`fbq('track', ...)`) e
+  pelo **Google Tag Manager / gtag** (`dataLayer`), sem alterar nenhum dos dois.
+  Eventos que não têm peso comercial ficam de fora: PageView, ViewContent,
+  rolagem, tempo na página, cliques genéricos, vídeo, eventos internos do GTM
+  (`gtm.*`) e os automáticos da Meta. Tudo o mais aparece (Lead, Contact,
+  Schedule, Purchase, InitiateCheckout, eventos personalizados como
+  `quiz_concluido`). O mesmo evento enviado pelo pixel e pelo GTM conta uma
+  vez; nomes do Google viram os da Meta (`generate_lead` → Lead). Evento que a
+  LP não manda para nenhum dos dois pode ser enviado com
+  `LeadHub.track("nome", { value })`.
+- **Pixel certo**: o painel mãe mostra o ID do pixel que a LP usa e avisa se o
+  pixel salvo para a API de Conversões for outro.
 - **Não remover o "(cód. XXXX)"** da mensagem: é o que liga a conversa à linha.
 - **LGPD** (ver `SEGURANCA-LGPD.md`): banner de consentimento antes de carregar
   pixel e Lead Hub; consentimento específico e destacado se o quiz perguntar

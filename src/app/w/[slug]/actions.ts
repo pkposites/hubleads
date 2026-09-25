@@ -7,6 +7,7 @@ import { after } from "next/server";
 import { sendLeadConversions } from "@/lib/conversions";
 import { call, DbError } from "@/lib/db";
 import { fromLocalInput } from "@/lib/format";
+import type { LpEvent } from "@/lib/lp-events";
 import { isStatus, parseMoney, type HistoryEntry, type Lead, type Status, type Template } from "@/lib/leads";
 import { normalizePhone } from "@/lib/normalize";
 import { requireWorkspace, SESSION_COOKIE } from "@/lib/session";
@@ -137,11 +138,14 @@ export async function logContact(slug: string, leadId: string, template: string)
   }
 }
 
-export async function leadHistory(slug: string, leadId: string): Promise<{ history?: HistoryEntry[]; error?: string }> {
+export async function leadHistory(
+  slug: string,
+  leadId: string,
+): Promise<{ history?: HistoryEntry[]; lpEvents?: LpEvent[]; error?: string }> {
   const { token } = await requireWorkspace(slug);
   try {
-    const detail = await call<{ history: HistoryEntry[] }>("lh_lead_detail", { p_token: token, p_lead_id: leadId });
-    return { history: detail.history };
+    const detail = await call<{ history: HistoryEntry[]; lp_events: LpEvent[] }>("lh_lead_detail", { p_token: token, p_lead_id: leadId });
+    return { history: detail.history, lpEvents: detail.lp_events };
   } catch {
     return { error: "Não foi possível carregar o histórico." };
   }

@@ -44,6 +44,15 @@ const post = (body: unknown, headers: Record<string, string> = {}) =>
   });
 
 describe("POST /api/collect", () => {
+  it("drops page events with no commercial meaning", async () => {
+    const d = deps();
+    const res = await handleCollect(post({ ...event, type: "lp_event", data: { event: "PageView" } }), d);
+    expect(await res.json()).toEqual({ ok: true, ignored: true });
+    expect(d.collect).not.toHaveBeenCalled();
+    await handleCollect(post({ ...event, type: "lp_event", data: { event: "Lead", source: "pixel" } }), d);
+    expect(d.collect).toHaveBeenCalledTimes(1);
+  });
+
   it("announces only clicks that created a new row", async () => {
     const onNewLead = vi.fn();
     const created = deps({ onNewLead, collect: vi.fn(async () => ({ ok: true, lead_id: "L1", new_lead: true })) });
