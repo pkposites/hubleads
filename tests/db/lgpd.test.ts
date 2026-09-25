@@ -151,3 +151,26 @@ describe("LGPD", () => {
     expect(audit).toEqual([{ actor: "sistema" }]);
   });
 });
+
+describe("infrastructure numbers for the admin", () => {
+  let pool: Pool;
+  beforeAll(() => {
+    pool = createPool();
+  });
+  afterAll(() => pool.end());
+
+  it("reports sizes, growth and whether other systems share the database", async () => {
+    const admin = await setupAdmin(pool);
+    const ws = await setupWorkspace(pool, "Infra");
+    await collect(pool, ws.key, { type: "page_view", visitor_id: "infra-1" });
+    await pool.query("create table if not exists public.outro_sistema (id int)");
+    const infra = await anon<Record<string, number>>(pool, "select lh_admin_infra($1) as r", [admin.token]);
+    expect(infra.other_tables).toBeGreaterThanOrEqual(1);
+    expect(infra.db_bytes).toBeGreaterThan(infra.lh_bytes);
+    expect(infra.lh_bytes).toBeGreaterThan(0);
+    expect(infra.clients).toBeGreaterThanOrEqual(1);
+    expect(infra.events_7d).toBeGreaterThanOrEqual(1);
+    expect(infra.bytes_per_day).toBeGreaterThan(0);
+    await expect(anon(pool, "select lh_admin_infra($1) as r", [ws.token])).rejects.toBeTruthy();
+  });
+});

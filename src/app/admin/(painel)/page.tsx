@@ -3,13 +3,19 @@ import { buttonClass, EmptyState } from "@/components/ui";
 import { requireAdmin, type ClientSummary } from "@/lib/admin";
 import { call } from "@/lib/db";
 import { formatDateTime, isWithinDays, timeSince } from "@/lib/format";
+import { dbLimitMb, evaluateInfra, type InfraNumbers } from "@/lib/infra";
+import { InfraAlert } from "./infra-alert";
 
 export default async function AdminHome() {
   const { token } = await requireAdmin();
-  const clients = await call<ClientSummary[]>("lh_admin_list_workspaces", { p_token: token });
+  const [clients, infra] = await Promise.all([
+    call<ClientSummary[]>("lh_admin_list_workspaces", { p_token: token }),
+    call<InfraNumbers>("lh_admin_infra", { p_token: token }).catch(() => null),
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
+      {infra && <InfraAlert status={evaluateInfra(infra, dbLimitMb())} numbers={infra} />}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Clientes</h1>
         <Link href="/admin/novo" className={buttonClass()}>
