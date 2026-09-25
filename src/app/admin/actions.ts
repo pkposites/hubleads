@@ -168,9 +168,15 @@ export async function saveMetaSettings(workspaceId: string, _prev: AdminFormStat
 }
 
 export async function sendMetaTest(workspaceId: string, testCode: string): Promise<{ ok: boolean; message: string }> {
-  await requireAdmin();
+  const { token } = await requireAdmin();
   const code = testCode.trim();
   if (code && !/^[A-Za-z0-9_-]{2,40}$/.test(code)) return { ok: false, message: "Código de teste inválido." };
+  // The send below uses the server secret, so check first that this admin may manage the client.
+  try {
+    await call("lh_admin_get_meta", { p_token: token, p_workspace_id: workspaceId });
+  } catch {
+    return { ok: false, message: "Cliente não encontrado." };
+  }
   const h = await headers();
   const request = new Request("https://x", { headers: h });
   const result = await sendTestConversion(
@@ -205,4 +211,64 @@ export async function savePrivacySettings(workspaceId: string, _prev: AdminFormS
   }
   revalidatePath(`/admin/clientes/${workspaceId}`);
   return { ok: "Salvo." };
+}
+
+// ---------------------------------------------------------------------------
+// Gestores (master only; checked again in the database)
+// ---------------------------------------------------------------------------
+
+export type GestorState = { error?: string; created?: { login: string; password: string } } | undefined;
+
+export async function createGestor(_prev: GestorState, formData: FormData): Promise<GestorState> {
+  const { token } = await requireAdmin();
+  const login = String(formData.get("login") ?? "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(login)) return { error: "Informe o e-mail do gestor." };
+  try {
+    const result = await call<{ login: string; password: string }>("lh_admin_create_gestor", { p_token: token, p_login: login });
+    revalidatePath("/admin/gestores");
+    return { created: result };
+  } catch (error) {
+    if (error instanceof DbError && error.code === "23505") return { error: "Já existe um acesso com esse e-mail." };
+    if (error instanceof DbError && error.code === "LH403") return { error: "Só o administrador master cria gestores." };
+    return { error: "Não foi possível criar o gestor." };
+  }
+}
+
+export async function resetGestorPassword(adminId: string): Promise<{ password?: string; error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    const password = await call<string>("lh_admin_reset_admin_password", { p_token: token, p_admin_id: adminId });
+    revalidatePath("/admin/gestores");
+    return { password };
+  } catch {
+    return { error: "Não foi possível gerar a senha." };
+  }
+}
+
+export async function deactivateGestor(adminId: string): Promise<{ error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    await call("lh_admin_deactivate_gestor", { p_token: token, p_admin_id: adminId });
+    revalidatePath("/admin/gestores");
+    return {};
+  } catch {
+    return { error: "Não foi possível desativar." };
+  }
+}
+
+export async function transferClient(workspaceId: string, _prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  const { token } = await requireAdmin();
+  const target = String(formData.get("owner") ?? "");
+  try {
+    await call("lh_admin_transfer_workspace", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_admin_id: target === "" ? null : target,
+    });
+  } catch {
+    return { error: "Não foi possível trocar o responsável." };
+  }
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+  revalidatePath("/admin");
+  return { ok: "Responsável atualizado." };
 }

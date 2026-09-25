@@ -47,6 +47,9 @@
 - Dados de saúde: respostas do quiz nunca vão para a Meta; o prompt de
   instalação exige caixa de consentimento específico para perguntas de saúde.
 - Histórico de alterações por lead (quem e quando, por papel).
+- **Painéis separados por gestor**: cada gestor vê só os próprios clientes; o
+  master vê todos. Todas as funções do painel mãe conferem o dono do cliente
+  antes de responder, e um teste automático percorre todas elas.
 
 ## Pendente
 

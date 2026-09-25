@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { Button, Card, EmptyState } from "@/components/ui";
-import { appOrigin, installPrompt, requireAdmin, snippet, type ClientSummary } from "@/lib/admin";
+import { appOrigin, installPrompt, requireAdmin, snippet, type AdminUser, type ClientSummary } from "@/lib/admin";
 import { channelLabel } from "@/lib/attribution";
 import { call, DbError } from "@/lib/db";
 import { formatDateTime } from "@/lib/format";
@@ -9,7 +9,7 @@ import type { LeadEvent } from "@/lib/leads";
 import { eventLabel } from "@/lib/lp-events";
 import { openClientSheet } from "../../../actions";
 import { encryptionKey, serverSecret } from "@/lib/server";
-import { AddPageForm, PageSettings, ResetPassword } from "./client-actions";
+import { AddPageForm, OwnerForm, PageSettings, ResetPassword } from "./client-actions";
 import { MetaSettings, type MetaSettingsData } from "./meta-settings";
 import { PrivacySettings } from "./privacy-settings";
 import type { PrivacySettings as PrivacyData } from "@/lib/privacy";
@@ -31,7 +31,7 @@ function eventName(e: LeadEvent) {
 
 export default async function ClientPage({ params }: PageProps<"/admin/clientes/[id]">) {
   const { id } = await params;
-  const { token } = await requireAdmin();
+  const { token, role } = await requireAdmin();
 
   let client: ClientSummary;
   try {
@@ -47,6 +47,10 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
     call<PrivacyData>("lh_admin_get_privacy", { p_token: token, p_workspace_id: id }),
   ]);
   const origin = await appOrigin();
+  const gestores =
+    role === "master"
+      ? (await call<AdminUser[]>("lh_admin_list_admins", { p_token: token })).filter((a) => a.role === "gestor" && a.active)
+      : [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -61,6 +65,12 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
           <Button>Abrir planilha do cliente</Button>
         </form>
       </div>
+
+      {role === "master" && (
+        <Card title="Responsável">
+          <OwnerForm workspaceId={client.id} ownerId={client.owner_admin_id} gestores={gestores} />
+        </Card>
+      )}
 
       <Card title="Acesso do atendente">
         <div className="flex flex-col gap-3 text-sm">

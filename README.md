@@ -69,14 +69,20 @@ Detalhes e pendências em [docs/SEGURANCA-LGPD.md](docs/SEGURANCA-LGPD.md).
 
 ## Acesso
 
-- **Painel mãe** (`/admin`): o administrador cria clientes e Landing Pages,
-  copia o código e o prompt de instalação de cada LP, gera ou troca a senha
-  do atendente, vê os eventos recebidos, abre a planilha de qualquer cliente
-  e exclui linhas (por exemplo, testes) com uma etapa de confirmação.
-  Administradores são criados no banco:
-  ```sql
-  select lh_private.create_admin('email@exemplo.com', '<senha com 10+ caracteres>');
-  ```
+- **Painel mãe** (`/admin`): cria clientes e Landing Pages, copia o código e o
+  prompt de instalação de cada LP, gera ou troca a senha do atendente, vê os
+  eventos recebidos, abre a planilha de qualquer cliente e exclui linhas (por
+  exemplo, testes) com uma etapa de confirmação. Há dois papéis:
+  - **master**: vê todos os clientes e cria, desativa ou troca a senha dos
+    gestores (menu **Gestores**). Também escolhe o gestor responsável de cada
+    cliente. O master é criado no banco:
+    ```sql
+    select lh_private.create_admin('email@exemplo.com', '<senha com 10+ caracteres>');
+    ```
+  - **gestor**: criado pelo master no painel; vê e administra só os clientes
+    que criou ou que o master passou para ele. Um cliente de outro gestor
+    responde como se não existisse. Desativar um gestor encerra as sessões
+    dele na hora.
 - **Atendente** (`/w/<cliente>`): entra com a senha do cliente e vê só a
   planilha. Pode editar nome, telefone, status, valor e observações, mas não
   exclui linhas nem vê configurações.

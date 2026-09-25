@@ -3,7 +3,7 @@ import { requireAdmin } from "@/lib/admin";
 import { adminLogout } from "../actions";
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const { login } = await requireAdmin();
+  const { login, role } = await requireAdmin();
   return (
     <div className="flex flex-1 flex-col">
       <header className="border-b border-zinc-800 bg-zinc-900 text-white">
@@ -18,9 +18,17 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
             <Link href="/admin/novo" className="hover:text-white">
               Novo cliente
             </Link>
+            {role === "master" && (
+              <Link href="/admin/gestores" className="hover:text-white">
+                Gestores
+              </Link>
+            )}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm text-zinc-300">
-            <span>{login}</span>
+            <span>
+              {login}
+              <span className="ml-1.5 rounded bg-zinc-700 px-1.5 py-0.5 text-xs">{role === "master" ? "master" : "gestor"}</span>
+            </span>
             <form action={adminLogout}>
               <button className="hover:text-white hover:underline">Sair</button>
             </form>

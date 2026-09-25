@@ -7,10 +7,11 @@ import { dbLimitMb, evaluateInfra, type InfraNumbers } from "@/lib/infra";
 import { InfraAlert } from "./infra-alert";
 
 export default async function AdminHome() {
-  const { token } = await requireAdmin();
+  const { token, role } = await requireAdmin();
+  const isMaster = role === "master";
   const [clients, infra] = await Promise.all([
     call<ClientSummary[]>("lh_admin_list_workspaces", { p_token: token }),
-    call<InfraNumbers>("lh_admin_infra", { p_token: token }).catch(() => null),
+    isMaster ? call<InfraNumbers>("lh_admin_infra", { p_token: token }).catch(() => null) : null,
   ]);
 
   return (
@@ -35,7 +36,10 @@ export default async function AdminHome() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="font-medium">{c.name}</div>
-                      <div className="text-xs text-zinc-500">/w/{c.slug}</div>
+                      <div className="text-xs text-zinc-500">
+                        /w/{c.slug}
+                        {isMaster && c.owner_login ? ` · ${c.owner_login}` : ""}
+                      </div>
                     </div>
                     <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${active ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
                       {active ? "Recebendo dados" : c.last_event_at ? "Sem dados há 3+ dias" : "Aguardando instalação"}
@@ -64,7 +68,7 @@ export default async function AdminHome() {
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
               <tr>
-                {["Cliente", "Landing Pages", "Leads 7 dias", "Leads total", "Sem telefone", "Último lead", "LP ativa?"].map((h) => (
+                {["Cliente", ...(isMaster ? ["Gestor"] : []), "Landing Pages", "Leads 7 dias", "Leads total", "Sem telefone", "Último lead", "LP ativa?"].map((h) => (
                   <th key={h} className="px-3 py-2 font-medium">
                     {h}
                   </th>
@@ -82,6 +86,7 @@ export default async function AdminHome() {
                       </Link>
                       <div className="text-xs text-zinc-500">/w/{c.slug}</div>
                     </td>
+                    {isMaster && <td className="px-3 py-2 text-xs">{c.owner_login ?? <span className="text-zinc-500">Você</span>}</td>}
                     <td className="px-3 py-2">{c.pages.length}</td>
                     <td className="px-3 py-2 tabular-nums">{c.leads_7d}</td>
                     <td className="px-3 py-2 tabular-nums">{c.leads_total}</td>

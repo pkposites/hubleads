@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { Button, Field, FormMessage, inputClass } from "@/components/ui";
 import type { Page } from "@/lib/leads";
-import { addPage, resetPassword, updatePageSettings } from "../../../actions";
+import { addPage, resetPassword, transferClient, updatePageSettings } from "../../../actions";
 import { AccessCard } from "../../access-card";
 
 export function ResetPassword({ origin, id, name, slug }: { origin: string; id: string; name: string; slug: string }) {
@@ -62,6 +62,37 @@ export function AddPageForm({ workspaceId }: { workspaceId: string }) {
       </Field>
       <Button type="submit" disabled={pending}>
         Adicionar
+      </Button>
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+/** Master only: which gestor manages this client ("" = the master). */
+export function OwnerForm({
+  workspaceId,
+  ownerId,
+  gestores,
+}: {
+  workspaceId: string;
+  ownerId: string | null;
+  gestores: { id: string; login: string }[];
+}) {
+  const [state, action, pending] = useActionState(transferClient.bind(null, workspaceId), undefined);
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-2">
+      <Field label="Gestor responsável" hint="Só o gestor responsável (e você) vê este cliente no painel.">
+        <select name="owner" defaultValue={ownerId ?? ""} className={`${inputClass} min-w-64`}>
+          <option value="">Você (master)</option>
+          {gestores.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.login}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Button type="submit" variant="secondary" disabled={pending}>
+        {pending ? "Salvando..." : "Salvar"}
       </Button>
       <FormMessage state={state} />
     </form>

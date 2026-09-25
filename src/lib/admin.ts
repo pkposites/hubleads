@@ -17,15 +17,29 @@ export interface ClientSummary {
   without_phone: number;
   last_lead_at: string | null;
   last_event_at: string | null;
+  owner_admin_id: string | null;
+  owner_login: string | null;
   pages: Page[];
 }
 
-export const currentAdmin = cache(async (): Promise<{ token: string; login: string } | null> => {
+export type AdminRole = "master" | "gestor";
+
+export interface AdminUser {
+  id: string;
+  login: string;
+  role: AdminRole;
+  active: boolean;
+  created_at: string;
+  clients: number;
+  last_login_at: string | null;
+}
+
+export const currentAdmin = cache(async (): Promise<{ token: string; login: string; role: AdminRole } | null> => {
   const token = (await cookies()).get(ADMIN_COOKIE)?.value;
   if (!token) return null;
   try {
-    const admin = await call<{ login: string }>("lh_admin_session", { p_token: token });
-    return { token, login: admin.login };
+    const admin = await call<{ login: string; role: AdminRole }>("lh_admin_session", { p_token: token });
+    return { token, login: admin.login, role: admin.role };
   } catch (error) {
     if (error instanceof DbError && error.code === "LH401") return null;
     throw error;
@@ -35,6 +49,13 @@ export const currentAdmin = cache(async (): Promise<{ token: string; login: stri
 export async function requireAdmin() {
   const admin = await currentAdmin();
   if (!admin) redirect("/admin/entrar");
+  return admin;
+}
+
+/** Master-only pages (managing gestores). Gestores go back to their clients. */
+export async function requireMaster() {
+  const admin = await requireAdmin();
+  if (admin.role !== "master") redirect("/admin");
   return admin;
 }
 
