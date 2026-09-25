@@ -25,10 +25,10 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
             )}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm text-zinc-300">
-            <span>
+            <Link href="/admin/conta" className="hover:text-white" title="Minha conta">
               {login}
               <span className="ml-1.5 rounded bg-zinc-700 px-1.5 py-0.5 text-xs">{role === "master" ? "master" : "gestor"}</span>
-            </span>
+            </Link>
             <form action={adminLogout}>
               <button className="hover:text-white hover:underline">Sair</button>
             </form>

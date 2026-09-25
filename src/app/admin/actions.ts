@@ -7,7 +7,8 @@ import { requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
 import { clientIp } from "@/lib/collect";
 import { sendTestConversion } from "@/lib/conversions";
 import { encryptSecret } from "@/lib/crypto";
-import { encryptionKey, lockedMessage, loginClient } from "@/lib/server";
+import { mailReady, publicAppUrl, resetPasswordEmail, sendMail } from "@/lib/mail";
+import { encryptionKey, lockedMessage, loginClient, serverSecret } from "@/lib/server";
 import { call, DbError } from "@/lib/db";
 import { normalizeDomain } from "@/lib/domains";
 import { slugify } from "@/lib/format";
@@ -52,6 +53,73 @@ export async function adminLogout() {
   if (token) await call("lh_admin_logout", { p_token: token }).catch(() => undefined);
   store.delete(ADMIN_COOKIE);
   redirect("/admin/entrar");
+}
+
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/** New password typed twice; returns the error to show, if any. */
+function checkNewPassword(formData: FormData): { password: string } | { error: string } {
+  const password = String(formData.get("new_password") ?? "");
+  if (password.length < 10) return { error: "A senha nova precisa ter pelo menos 10 caracteres." };
+  if (password.length > 200) return { error: "A senha nova é longa demais." };
+  if (password !== String(formData.get("confirm_password") ?? "")) return { error: "As duas senhas não são iguais." };
+  return { password };
+}
+
+/** Minha conta: the logged-in admin changes their own password. */
+export async function changeAdminPassword(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  const { token } = await requireAdmin();
+  const checked = checkNewPassword(formData);
+  if ("error" in checked) return checked;
+  const result = await call<{ ok?: boolean; error?: string; retry_after?: number }>("lh_admin_change_password", {
+    p_token: token,
+    p_current: String(formData.get("current_password") ?? ""),
+    p_new: checked.password,
+  });
+  if (result.error === "locked") return { error: lockedMessage(result.retry_after ?? 900) };
+  if (!result.ok) return { error: "A senha atual está incorreta." };
+  return { ok: "Senha alterada. Nos outros aparelhos, será preciso entrar de novo." };
+}
+
+/**
+ * Esqueci minha senha: e-mails a one-time link. The answer is the same whether
+ * or not the e-mail has access, and takes at least the same time, so the page
+ * does not reveal who is registered.
+ */
+export async function requestAdminReset(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  const login = String(formData.get("login") ?? "").trim().toLowerCase();
+  if (!EMAIL.test(login)) return { error: "Informe um e-mail válido.", login };
+  const secret = serverSecret();
+  const base = publicAppUrl();
+  if (!secret || !base || !mailReady()) {
+    return { error: "A recuperação por e-mail ainda não está configurada. Fale com o administrador do Lead Hub.", login };
+  }
+  const started = Date.now();
+  const reset = await call<{ token: string; login: string } | null>("lh_server_admin_reset_request", {
+    p_secret: secret,
+    p_login: login,
+  });
+  if (reset) await sendMail({ to: reset.login, ...resetPasswordEmail(`${base}/admin/redefinir?t=${reset.token}`) });
+  await new Promise((resolve) => setTimeout(resolve, Math.max(0, 1500 - (Date.now() - started))));
+  return {
+    ok: "Se este e-mail tiver acesso ao painel, enviamos um link para criar uma senha nova. Ele vale por 30 minutos. Confira também a caixa de spam.",
+    login,
+  };
+}
+
+/** Sets the new password from the e-mailed link. */
+export async function resetAdminPassword(resetToken: string, _prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  const checked = checkNewPassword(formData);
+  if ("error" in checked) return checked;
+  const secret = serverSecret();
+  if (!secret) return { error: "A recuperação de senha não está configurada no servidor." };
+  const result = await call<{ login: string } | null>("lh_server_admin_reset_password", {
+    p_secret: secret,
+    p_token: resetToken,
+    p_new: checked.password,
+  });
+  if (!result) return { error: "Este link expirou ou já foi usado. Peça um novo em \"Esqueci minha senha\"." };
+  redirect("/admin/entrar?senha=nova");
 }
 
 export type CreateClientState =
@@ -194,7 +262,7 @@ export async function sendMetaTest(workspaceId: string, testCode: string): Promi
 export async function savePrivacySettings(workspaceId: string, _prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
   const { token } = await requireAdmin();
   const email = String(formData.get("email") ?? "").trim();
-  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "E-mail inválido." };
+  if (email && !EMAIL.test(email)) return { error: "E-mail inválido." };
   const months = Number(formData.get("retention_months") ?? 24);
   if (!Number.isInteger(months) || months < 1 || months > 120) return { error: "Prazo de guarda entre 1 e 120 meses." };
   try {
@@ -222,7 +290,7 @@ export type GestorState = { error?: string; created?: { login: string; password:
 export async function createGestor(_prev: GestorState, formData: FormData): Promise<GestorState> {
   const { token } = await requireAdmin();
   const login = String(formData.get("login") ?? "").trim().toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(login)) return { error: "Informe o e-mail do gestor." };
+  if (!EMAIL.test(login)) return { error: "Informe o e-mail do gestor." };
   try {
     const result = await call<{ login: string; password: string }>("lh_admin_create_gestor", { p_token: token, p_login: login });
     revalidatePath("/admin/gestores");

@@ -50,6 +50,11 @@
 - **Painéis separados por gestor**: cada gestor vê só os próprios clientes; o
   master vê todos. Todas as funções do painel mãe conferem o dono do cliente
   antes de responder, e um teste automático percorre todas elas.
+- **Senha do painel mãe**: cada admin troca a própria senha (pede a atual, com
+  o mesmo limite de tentativas do login) e recupera por e-mail com link de uso
+  único, válido 30 minutos, guardado só como hash e criado só pelo servidor
+  do app. A tela não revela se o e-mail tem acesso. Trocar ou recuperar a
+  senha encerra as outras sessões.
 
 ## Pendente
 

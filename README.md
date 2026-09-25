@@ -83,6 +83,13 @@ Detalhes e pendências em [docs/SEGURANCA-LGPD.md](docs/SEGURANCA-LGPD.md).
     que criou ou que o master passou para ele. Um cliente de outro gestor
     responde como se não existisse. Desativar um gestor encerra as sessões
     dele na hora.
+  - **Minha conta** (clique no seu e-mail no topo): troca a própria senha
+    digitando a atual; os outros aparelhos saem.
+  - **Esqueci minha senha** (tela de login): manda por e-mail um link para
+    criar uma senha nova. O link vale 30 minutos, funciona uma vez, só o
+    último pedido vale e há no máximo 3 por hora por conta. A resposta é a
+    mesma para e-mails sem acesso. Gestor desativado não recupera: o master
+    reativa. Precisa de `RESEND_API_KEY` e `LH_MAIL_FROM` (veja abaixo).
 - **Atendente** (`/w/<cliente>`): entra com a senha do cliente e vê só a
   planilha. Pode editar nome, telefone, status, valor e observações, mas não
   exclui linhas nem vê configurações.
@@ -208,9 +215,14 @@ select lh_private.set_server_secret('<mesmo valor de LH_SERVER_SECRET>');
   a salvar de novo o token da Meta),
   `NEXT_PUBLIC_VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY` (gerar com
   `npx web-push generate-vapid-keys`) e, opcional, `META_GRAPH_VERSION`.
+  Para o "Esqueci minha senha": `RESEND_API_KEY` (conta em resend.com,
+  variável secreta) e `LH_MAIL_FROM`, por exemplo
+  `Lead Hub <nao-responda@cadeolead.com.br>`, com o domínio verificado no
+  Resend. O link do e-mail usa `NEXT_PUBLIC_APP_URL` (ou a URL principal do
+  Netlify), nunca o endereço da requisição.
   Sem o segredo ou as chaves VAPID, avisos e envio à Meta ficam desligados e o
   resto funciona normalmente.
-- `LH_SERVER_SECRET`, `LH_ENCRYPTION_KEY` e `VAPID_PRIVATE_KEY` são variáveis
+- `LH_SERVER_SECRET`, `LH_ENCRYPTION_KEY`, `VAPID_PRIVATE_KEY` e `RESEND_API_KEY` são variáveis
   secretas: no Netlify, grave-as com o contexto **Production** (o Netlify não
   guarda variável secreta no contexto "todos") e publique de novo depois de
   criar ou trocar qualquer uma delas. O painel mãe avisa, no cartão da Meta,
