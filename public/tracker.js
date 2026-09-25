@@ -125,6 +125,16 @@
   }
 
   // --- attribution ---------------------------------------------------------
+  // Pages may strip campaign names from the address bar before the Meta pixel
+  // runs (health-related wording must not reach Meta) and leave the original
+  // address in window.lhLandingUrl; the origin is read from there.
+  function landingUrl() {
+    var original = window.lhLandingUrl;
+    if (typeof original === "string" && original.indexOf(window.location.origin + window.location.pathname) === 0) {
+      return original.split("#")[0];
+    }
+    return window.location.href.split("#")[0];
+  }
   function readAttribution() {
     var stored = null;
     try {
@@ -132,7 +142,7 @@
     } catch (e) {}
     if (stored && Date.now() - stored.saved_at > ATTR_TTL_MS) stored = null;
 
-    var params = new URLSearchParams(window.location.search);
+    var params = new URLSearchParams(landingUrl().split("?")[1] || "");
     var fromUrl = {};
     var hasParams = false;
     TRACKING_PARAMS.forEach(function (p) {
@@ -158,7 +168,7 @@
     var attr = stored;
     if (hasParams || !stored) {
       attr = fromUrl;
-      attr.landing_url = window.location.href.split("#")[0];
+      attr.landing_url = landingUrl().split("#")[0];
       attr.referrer = document.referrer || null;
       attr.first_seen_at = (stored && stored.first_seen_at) || new Date().toISOString();
       attr.saved_at = Date.now();

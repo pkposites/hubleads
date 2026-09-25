@@ -175,6 +175,24 @@ describe("tracker.js", () => {
     expect(sent.at(-1)?.data).toEqual({ event: "form_step", source: "api" });
   });
 
+  it("reads the original campaign when the page cleaned the address bar", async () => {
+    (window as { lhLandingUrl?: string }).lhLandingUrl =
+      "http://localhost:3000/lp?utm_source=facebook&utm_campaign=Campanha%20A&fbclid=IwAR9";
+    const { sent, flush } = load("/lp?utm_source=facebook&fbclid=IwAR9");
+    await flush();
+    delete (window as { lhLandingUrl?: string }).lhLandingUrl;
+    expect(sent[0].attribution).toMatchObject({ utm_source: "facebook", utm_campaign: "Campanha A", fbclid: "IwAR9" });
+  });
+
+  it("ignores an original address from another page", async () => {
+    (window as { lhLandingUrl?: string }).lhLandingUrl = "https://outro.site/?utm_campaign=X";
+    const { sent, flush } = load("/?utm_source=google");
+    await flush();
+    delete (window as { lhLandingUrl?: string }).lhLandingUrl;
+    expect(sent[0].attribution).toMatchObject({ utm_source: "google" });
+    expect(sent[0].attribution).not.toHaveProperty("utm_campaign");
+  });
+
   describe("consent (LGPD)", () => {
     beforeEach(() => {
       delete (window as { fbq?: unknown }).fbq;
