@@ -19,7 +19,42 @@ export default async function AdminHome() {
       {clients.length === 0 ? (
         <EmptyState title="Nenhum cliente ainda">Crie o primeiro para gerar o código da LP e a senha do atendente.</EmptyState>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+        <>
+        <ul className="flex flex-col gap-2 md:hidden">
+          {clients.map((c) => {
+            const active = isWithinDays(c.last_event_at, 3);
+            return (
+              <li key={c.id}>
+                <Link href={`/admin/clientes/${c.id}`} className="block rounded-lg border border-zinc-200 bg-white p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium">{c.name}</div>
+                      <div className="text-xs text-zinc-500">/w/{c.slug}</div>
+                    </div>
+                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${active ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+                      {active ? "Recebendo dados" : c.last_event_at ? "Sem dados há 3+ dias" : "Aguardando instalação"}
+                    </span>
+                  </div>
+                  <dl className="mt-2 grid grid-cols-3 gap-2 text-xs text-zinc-600">
+                    <div>
+                      <dt>Leads 7 dias</dt>
+                      <dd className="text-sm font-medium text-zinc-900">{c.leads_7d}</dd>
+                    </div>
+                    <div>
+                      <dt>Total</dt>
+                      <dd className="text-sm font-medium text-zinc-900">{c.leads_total}</dd>
+                    </div>
+                    <div>
+                      <dt>Sem telefone</dt>
+                      <dd className="text-sm font-medium text-zinc-900">{c.without_phone}</dd>
+                    </div>
+                  </dl>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-white md:block">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
               <tr>
@@ -70,6 +105,7 @@ export default async function AdminHome() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

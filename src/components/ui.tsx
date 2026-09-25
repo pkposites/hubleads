@@ -4,7 +4,8 @@ const cx = (...classes: (string | false | null | undefined)[]) => classes.filter
 
 export const buttonClass = (variant: "primary" | "secondary" | "danger" = "primary") =>
   cx(
-    "inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition",
+    // Taller on phones so every button is an easy tap target.
+    "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition sm:min-h-0 sm:py-1.5",
     "disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900",
     variant === "primary" && "bg-zinc-900 text-white hover:bg-zinc-700",
     variant === "secondary" && "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50",
@@ -20,8 +21,9 @@ export function Button({
 }
 
 /** Input styling without a width, for inline controls such as filters. */
+// 16px text on phones keeps iOS from zooming in when a field gets focus.
 export const controlClass =
-  "rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm shadow-xs placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none";
+  "rounded-md border border-zinc-300 bg-white px-2.5 py-2 text-base shadow-xs placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none sm:py-1.5 sm:text-sm";
 
 export const inputClass = `w-full ${controlClass}`;
 

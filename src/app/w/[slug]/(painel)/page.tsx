@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { buttonClass, controlClass, EmptyState } from "@/components/ui";
 import { CHANNELS } from "@/lib/attribution";
 import { call } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
-import { isStatus, PERIODS, periodStart, STATUSES, type Lead, type Stats } from "@/lib/leads";
+import { formatRate, isStatus, PERIODS, periodStart, rate, STATUSES, type Lead, type Stats } from "@/lib/leads";
 import { requireWorkspace } from "@/lib/session";
 import { AutoRefresh } from "./auto-refresh";
 import { LeadSheet } from "./lead-sheet";
@@ -12,7 +13,7 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 
 function Tile({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3">
+    <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3">
       <div className="text-xs text-zinc-500">{label}</div>
       <div className="text-xl font-semibold tabular-nums">{value}</div>
       {hint && <div className="text-xs text-zinc-500">{hint}</div>}
@@ -44,30 +45,36 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
     }),
   ]);
 
-  const rate = stats.visitors ? `${Math.round((stats.clicks / stats.visitors) * 100)}% das visitas` : undefined;
   const exportQuery = new URLSearchParams({ periodo: period, ...(status && { status }), ...(channel && { origem: channel }), ...(q && { q }) });
 
   return (
     <div className="flex flex-col gap-4">
       <AutoRefresh />
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5">
+        <Link
+          href={`/w/${slug}/metricas?periodo=${period}`}
+          className="col-span-2 rounded-lg border border-[#2a78d6]/30 bg-[#2a78d6]/5 px-3 py-2.5 hover:bg-[#2a78d6]/10 sm:px-4 sm:py-3 md:col-span-1"
+        >
+          <div className="text-xs text-zinc-600">Taxa de conversão</div>
+          <div className="text-2xl font-semibold">{formatRate(rate(stats.clicks, stats.visitors))}</div>
+          <div className="text-xs text-zinc-600">Ver métricas →</div>
+        </Link>
         <Tile label="Visitantes na LP" value={stats.visitors} />
-        <Tile label="Cliques no WhatsApp" value={stats.clicks} hint={rate} />
-        <Tile label="Leads" value={stats.leads} />
+        <Tile label="Clicaram no WhatsApp" value={stats.clicks} />
         <Tile label="Com telefone" value={stats.with_phone} hint={stats.leads ? `${stats.leads - stats.with_phone} a preencher` : undefined} />
         <Tile label="Vendas" value={stats.sales} hint={stats.sales ? formatMoney(stats.revenue) : undefined} />
       </div>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <form method="get" className="flex flex-wrap items-center gap-2">
-          <select name="periodo" defaultValue={period} className={`${controlClass} w-32`} aria-label="Período">
+        <form method="get" className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+          <select name="periodo" defaultValue={period} className={`${controlClass} sm:w-32`} aria-label="Período">
             {Object.entries(PERIODS).map(([k, label]) => (
               <option key={k} value={k}>
                 {label}
               </option>
             ))}
           </select>
-          <select name="status" defaultValue={status} className={`${controlClass} w-40`} aria-label="Status">
+          <select name="status" defaultValue={status} className={`${controlClass} sm:w-40`} aria-label="Status">
             <option value="">Todos os status</option>
             {Object.entries(STATUSES).map(([k, label]) => (
               <option key={k} value={k}>
@@ -75,7 +82,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
               </option>
             ))}
           </select>
-          <select name="origem" defaultValue={channel} className={`${controlClass} w-44`} aria-label="Origem">
+          <select name="origem" defaultValue={channel} className={`${controlClass} col-span-2 sm:w-44`} aria-label="Origem">
             <option value="">Todas as origens</option>
             {Object.entries(CHANNELS).map(([k, label]) => (
               <option key={k} value={k}>
@@ -83,10 +90,10 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
               </option>
             ))}
           </select>
-          <input name="q" defaultValue={q} placeholder="Código, nome, telefone, campanha" className={`${controlClass} w-64`} />
-          <button className={buttonClass("secondary")}>Filtrar</button>
+          <input name="q" defaultValue={q} placeholder="Código, nome, telefone, campanha" className={`${controlClass} col-span-2 sm:w-64`} />
+          <button className={`${buttonClass("secondary")} col-span-2 sm:col-span-1`}>Filtrar</button>
         </form>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <NewLeadForm slug={slug} />
           <a href={`/w/${slug}/exportar?${exportQuery}`} className={buttonClass("secondary")}>
             Exportar CSV

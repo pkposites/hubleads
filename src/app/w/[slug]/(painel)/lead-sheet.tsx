@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui";
 import { channelLabel } from "@/lib/attribution";
 import { formatDateTime, formatMoney, formatPhone, timeSince } from "@/lib/format";
+import { whatsappDigits } from "@/lib/normalize";
 import { adNames, answerEntries, answerLabel, STATUSES, type Lead, type Status } from "@/lib/leads";
 import { deleteLeads, updateLeadField, type EditableField } from "../actions";
 
@@ -77,7 +78,7 @@ function TextCell({
           if (e.key === "Enter") e.currentTarget.blur();
           if (e.key === "Escape") setValue(saved);
         }}
-        className={`${className} rounded border border-transparent bg-transparent px-1.5 py-1 text-sm hover:border-zinc-300 focus:border-zinc-900 focus:bg-white focus:outline-none ${
+        className={`${className} rounded border border-transparent bg-transparent px-1.5 py-1 text-base hover:border-zinc-300 md:text-sm focus:border-zinc-900 focus:bg-white focus:outline-none ${
           pending ? "opacity-60" : ""
         } ${field === "phone" && !value ? "border-dashed border-amber-300 bg-amber-50/60" : ""}`}
       />
@@ -101,7 +102,7 @@ function StatusCell({ slug, lead }: { slug: string; lead: Lead }) {
           setStatus(next);
           save(next, () => undefined, () => setStatus(previous));
         }}
-        className={`rounded px-2 py-1 text-sm font-medium ${STATUS_STYLE[status]}`}
+        className={`rounded px-2 py-1.5 text-base font-medium md:py-1 md:text-sm ${STATUS_STYLE[status]}`}
       >
         {Object.entries(STATUSES).map(([key, label]) => (
           <option key={key} value={key}>
@@ -135,6 +136,95 @@ function AdCell({ name, id }: { name: string | null; id: string | null }) {
   );
 }
 
+/** Phones: one card per lead, editable fields first, origin behind a tap. */
+function LeadCard({
+  slug,
+  lead,
+  selectable,
+  selected,
+  onToggle,
+}: {
+  slug: string;
+  lead: Lead;
+  selectable: boolean;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  const names = adNames(lead);
+  const answers = answerEntries(lead.extra);
+  const wa = whatsappDigits(lead.phone);
+  const moneyDisplay = (v: unknown) =>
+    v === null || v === undefined || v === "" ? "" : formatMoney(v as number).replace(/\u00a0/g, " ");
+  return (
+    <li className={`rounded-lg border bg-white p-3 ${selected ? "border-red-300 bg-red-50/50" : "border-zinc-200"}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {selectable && (
+            <input type="checkbox" className="size-5" aria-label={`Selecionar ${lead.code}`} checked={selected} onChange={onToggle} />
+          )}
+          <span className="rounded bg-zinc-900 px-1.5 py-0.5 font-mono text-xs text-white">{lead.code}</span>
+          <span className="text-xs text-zinc-500">
+            {formatDateTime(lead.created_at)} · {timeSince(lead.created_at)}
+          </span>
+        </div>
+        <span className="shrink-0 text-xs text-zinc-600">{channelLabel(lead.channel)}</span>
+      </div>
+      <div className="mt-2 flex flex-col gap-1">
+        <TextCell slug={slug} lead={lead} field="name" placeholder="Nome" className="w-full" />
+        <div className="flex items-start gap-2">
+          <div className="flex-1">
+            <TextCell
+              slug={slug}
+              lead={lead}
+              field="phone"
+              placeholder="Preencher telefone"
+              display={(v) => (v ? formatPhone(String(v)) : "")}
+              className="w-full"
+            />
+          </div>
+          {wa && (
+            <a
+              href={`https://wa.me/${wa}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white"
+            >
+              Abrir WhatsApp
+            </a>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <StatusCell slug={slug} lead={lead} />
+          <TextCell slug={slug} lead={lead} field="sale_value" placeholder="Valor R$" display={moneyDisplay} className="w-full" />
+        </div>
+        <TextCell slug={slug} lead={lead} field="notes" placeholder="Anotar observação" className="w-full" />
+      </div>
+      <details className="mt-2 text-sm">
+        <summary className="cursor-pointer py-1 text-zinc-600">Origem e respostas</summary>
+        <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+          {[
+            ["Campanha", names.campaign],
+            ["Conjunto", names.adset],
+            ["Anúncio", names.ad],
+            ["Fonte", [lead.utm_source, lead.utm_medium].filter(Boolean).join(" / ")],
+            ["Página", lead.landing_url],
+            ["Dispositivo", lead.device],
+            ["Cliques", String(lead.clicks)],
+            ...answers.map(([k, v]) => [answerLabel(k), v]),
+          ]
+            .filter(([, v]) => v)
+            .map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt className="text-zinc-500">{k}</dt>
+                <dd className="break-all">{v}</dd>
+              </div>
+            ))}
+        </dl>
+      </details>
+    </li>
+  );
+}
+
 /** Confirmation step before rows are deleted for good. */
 function DeleteDialog({
   leads,
@@ -150,8 +240,8 @@ function DeleteDialog({
   error: string | null;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-md rounded-t-xl bg-white p-5 shadow-xl sm:rounded-lg">
         <h2 className="text-base font-semibold">
           Excluir {leads.length} {leads.length === 1 ? "linha" : "linhas"}?
         </h2>
@@ -204,7 +294,7 @@ export function LeadSheet({ slug, leads, canDelete = false }: { slug: string; le
   return (
     <div className="flex flex-col gap-2">
       {canDelete && visibleSelected.length > 0 && (
-        <div className="flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm">
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm">
           <span>
             {visibleSelected.length} {visibleSelected.length === 1 ? "linha selecionada" : "linhas selecionadas"}
           </span>
@@ -238,7 +328,19 @@ export function LeadSheet({ slug, leads, canDelete = false }: { slug: string; le
           }
         />
       )}
-    <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+      <ul className="flex flex-col gap-2 md:hidden">
+        {leads.map((lead) => (
+          <LeadCard
+            key={lead.id}
+            slug={slug}
+            lead={lead}
+            selectable={canDelete}
+            selected={selected.has(lead.id)}
+            onToggle={() => toggle(lead.id)}
+          />
+        ))}
+      </ul>
+    <div className="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-white md:block">
       <table className="w-full min-w-[1900px] border-collapse text-left text-sm">
         <thead className="sticky top-0 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
           <tr className="border-b border-zinc-200">

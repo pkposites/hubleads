@@ -59,6 +59,20 @@ LeadHub.track("quiz_concluido", { etapa: 3 });                // qualquer outro 
   planilha. Pode editar nome, telefone, status, valor e observações, mas não
   exclui linhas nem vê configurações.
 
+## Métricas
+
+A aba **Métricas** (visível para o atendente e para o administrador) mostra a
+**taxa de conversão da LP** em destaque: pessoas que clicaram no WhatsApp ÷
+pessoas que visitaram (cliques repetidos da mesma pessoa contam uma vez). Traz
+também o funil (visitaram → clicaram → com telefone → agendaram → compraram),
+os visitantes e a conversão por dia, e o aproveitamento por origem, campanha,
+conjunto, anúncio ou dispositivo. Leads adicionados à mão ficam fora do funil
+da LP e aparecem numa nota à parte.
+
+Todas as telas funcionam no celular: a planilha vira uma lista de cartões
+editáveis (com botão para abrir o WhatsApp do lead), e os gráficos mostram os
+números do dia ao tocar.
+
 ## Dados para a Meta
 
 Para enviar conversões à Meta no futuro (Conversions API), cada lead guarda:

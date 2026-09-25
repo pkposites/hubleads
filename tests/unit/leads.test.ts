@@ -74,3 +74,14 @@ describe("quiz answers", () => {
     expect(b.endsWith(";;R$ 20 mil")).toBe(true);
   });
 });
+
+describe("conversion rate", () => {
+  it("is a share of people, capped at 100% and empty without visitors", async () => {
+    const { rate, formatRate } = await import("@/lib/leads");
+    expect(rate(1, 3)).toBe(33.3);
+    expect(rate(5, 4)).toBe(100);
+    expect(rate(0, 0)).toBeNull();
+    expect(formatRate(33.3)).toBe("33,3%");
+    expect(formatRate(null)).toBe("—");
+  });
+});

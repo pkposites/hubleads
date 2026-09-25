@@ -201,3 +201,39 @@ export function leadsToCsv(leads: readonly Lead[]): string {
   for (const lead of leads) lines.push(columns.map(([, get]) => csvCell(get(lead))).join(";"));
   return `﻿${lines.join("\r\n")}\r\n`;
 }
+
+export const DIMENSIONS = {
+  channel: "Origem",
+  campaign: "Campanha",
+  adset: "Conjunto",
+  ad: "Anúncio",
+  device: "Dispositivo",
+} as const;
+
+export type Dimension = keyof typeof DIMENSIONS;
+
+export interface MetricsRow {
+  key: string;
+  visitors: number;
+  clickers: number;
+  leads: number;
+  with_phone: number;
+  scheduled: number;
+  sales: number;
+  revenue: number;
+}
+
+export interface Metrics {
+  totals: Omit<MetricsRow, "key"> & { clicks: number; manual_leads: number };
+  rows: MetricsRow[];
+  daily: { day: string; visitors: number; clickers: number }[];
+}
+
+/** Share as a whole percentage, or null when there is nothing to divide by. */
+export function rate(part: number, whole: number): number | null {
+  if (!whole) return null;
+  return Math.min(100, Math.round((part / whole) * 1000) / 10);
+}
+
+export const formatRate = (value: number | null) =>
+  value === null ? "—" : `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
