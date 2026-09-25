@@ -9,6 +9,7 @@ import { NewLeadAlert } from "./new-lead-alert";
 import { PanelProvider } from "./panel-context";
 import { PanelNav } from "./panel-nav";
 import { PushToggle } from "./push-toggle";
+import { RefreshButton } from "./refresh-button";
 
 export default async function PanelLayout({ children, params }: LayoutProps<"/w/[slug]">) {
   const { slug } = await params;
@@ -40,6 +41,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
               <span className="truncate text-sm font-medium">{workspace.name}</span>
             </div>
             <div className="ml-auto flex items-center gap-1 sm:order-last">
+              <RefreshButton />
               <PushToggle vapidKey={vapidPublicKey()} />
               <form action={logout.bind(null, slug)}>
                 <button className="px-2 py-1.5 text-sm text-zinc-600 hover:underline">Sair</button>

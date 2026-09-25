@@ -12,6 +12,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  /* No double-tap zoom: taps respond immediately, also in the installed app. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

@@ -73,9 +73,11 @@ export function PushToggle({ vapidKey }: { vapidKey: string | null }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`rounded-md px-2 py-1.5 text-sm ${state === "on" ? "text-emerald-700" : "text-zinc-600 hover:bg-zinc-100"}`}
+        aria-label={state === "on" ? "Avisos ativos" : "Ativar avisos"}
+        className={`inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-sm transition active:scale-95 sm:min-h-8 ${state === "on" ? "text-emerald-700" : "text-zinc-600 hover:bg-zinc-100"}`}
       >
-        {state === "on" ? "🔔 Avisos ativos" : "🔕 Ativar avisos"}
+        <span aria-hidden>{state === "on" ? "🔔" : "🔕"}</span>
+        <span className="hidden sm:inline">{state === "on" ? "Avisos ativos" : "Ativar avisos"}</span>
       </button>
       {open && (
         <BottomSheet title="Avisos de novo lead" onClose={() => setOpen(false)}>

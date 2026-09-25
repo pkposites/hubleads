@@ -43,9 +43,12 @@ export async function logout(slug: string) {
 
 export type EditableField = "name" | "phone" | "status" | "notes" | "sale_value" | "next_contact_at";
 
-/** Booked or sold leads may owe an event to Meta (sent after the response). */
-function afterSave(slug: string, lead: Lead) {
-  revalidatePath(`/w/${slug}`, "layout");
+/**
+ * Booked or sold leads may owe an event to Meta (sent after the response).
+ * No revalidation here: the cell already shows the saved value, and the
+ * client refreshes the rest in the background so the tap feels instant.
+ */
+function afterSave(lead: Lead) {
   if (lead.status === "agendado" || lead.status === "venda") after(() => sendLeadConversions(lead.id));
 }
 
@@ -92,7 +95,7 @@ export async function updateLeadField(
 
   try {
     const lead = await call<Lead>("lh_update_lead", { p_token: token, p_lead_id: leadId, p_patch: { [field]: value } });
-    afterSave(slug, lead);
+    afterSave(lead);
     return { value: lead[field] };
   } catch (error) {
     if (error instanceof DbError && error.code === "LH404") return { error: "Lead não encontrado." };
@@ -118,7 +121,7 @@ export async function setLeadStatus(
       p_lead_id: leadId,
       p_patch: status === "perdido" ? { status, lost_reason: reason } : { status },
     });
-    afterSave(slug, lead);
+    afterSave(lead);
     return { lead };
   } catch (error) {
     if (error instanceof DbError && error.code === "LH404") return { error: "Lead não encontrado." };
@@ -131,7 +134,6 @@ export async function logContact(slug: string, leadId: string, template: string)
   const { token } = await requireWorkspace(slug);
   try {
     const lead = await call<Lead>("lh_log_contact", { p_token: token, p_lead_id: leadId, p_template: template.slice(0, 60) });
-    revalidatePath(`/w/${slug}`, "layout");
     return { lead };
   } catch {
     return { error: "Não foi possível registrar o contato." };

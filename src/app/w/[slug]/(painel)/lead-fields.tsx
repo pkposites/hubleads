@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Button, inputClass } from "@/components/ui";
 import { formatDateTime, formatMoney, formatPhone, formatWhen, localAt, toLocalInput } from "@/lib/format";
@@ -29,8 +30,15 @@ function useSynced<T>(value: T) {
   return [state, setState] as const;
 }
 
+/** Refreshes counters and lists in the background, without holding the tap. */
+function useBackgroundRefresh() {
+  const router = useRouter();
+  return () => window.setTimeout(() => router.refresh(), 0);
+}
+
 function useSave(leadId: string, field: EditableField) {
   const { slug } = usePanel();
+  const refresh = useBackgroundRefresh();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const save = (raw: string, onSaved: (value: unknown) => void, onFail: () => void) =>
@@ -42,6 +50,7 @@ function useSave(leadId: string, field: EditableField) {
       } else {
         setError(null);
         onSaved(result.value);
+        refresh();
       }
     });
   return { pending, error, save };
@@ -150,6 +159,7 @@ export function StatusCell({ lead }: { lead: Lead }) {
   const [asking, setAsking] = useState(false);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const refresh = useBackgroundRefresh();
 
   const apply = (next: Status, lostReason?: string) => {
     const previous = status;
@@ -163,6 +173,7 @@ export function StatusCell({ lead }: { lead: Lead }) {
         setError(null);
         setAsking(false);
         setReason(result.lead?.lost_reason ?? null);
+        refresh();
       }
     });
   };
@@ -172,13 +183,12 @@ export function StatusCell({ lead }: { lead: Lead }) {
       <select
         aria-label="Status"
         value={status}
-        disabled={pending}
         onChange={(e) => {
           const next = e.target.value as Status;
           if (next === "perdido") setAsking(true);
           else apply(next);
         }}
-        className={`rounded px-2 py-1.5 text-base font-medium md:py-1 md:text-sm ${STATUS_STYLE[status]}`}
+        className={`rounded px-2 py-1.5 text-base font-medium md:py-1 md:text-sm ${STATUS_STYLE[status]} ${pending ? "opacity-70" : ""}`}
       >
         {Object.entries(STATUSES).map(([key, label]) => (
           <option key={key} value={key}>
@@ -295,6 +305,7 @@ export function WhatsAppButton({ lead, compact = false }: { lead: Lead; compact?
   const { slug, company, templates } = usePanel();
   const [open, setOpen] = useState(false);
   const [, start] = useTransition();
+  const refresh = useBackgroundRefresh();
   const digits = whatsappDigits(lead.phone);
 
   const send = (templateName: string, text: string | null) => {
@@ -303,6 +314,7 @@ export function WhatsAppButton({ lead, compact = false }: { lead: Lead; compact?
     setOpen(false);
     start(async () => {
       await logContact(slug, lead.id, templateName);
+      refresh();
     });
   };
 
@@ -318,7 +330,7 @@ export function WhatsAppButton({ lead, compact = false }: { lead: Lead; compact?
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`shrink-0 rounded-md bg-emerald-600 font-medium text-white hover:bg-emerald-700 ${
+        className={`shrink-0 rounded-md bg-emerald-600 font-medium text-white transition hover:bg-emerald-700 active:scale-95 active:bg-emerald-800 ${
           compact ? "px-2 py-1 text-xs" : "min-h-10 px-3 py-2 text-sm"
         }`}
       >

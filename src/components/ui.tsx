@@ -5,7 +5,7 @@ const cx = (...classes: (string | false | null | undefined)[]) => classes.filter
 export const buttonClass = (variant: "primary" | "secondary" | "danger" = "primary") =>
   cx(
     // Taller on phones so every button is an easy tap target.
-    "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition sm:min-h-0 sm:py-1.5",
+    "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition active:scale-[0.97] sm:min-h-0 sm:py-1.5",
     "disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900",
     variant === "primary" && "bg-zinc-900 text-white hover:bg-zinc-700",
     variant === "secondary" && "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50",
