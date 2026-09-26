@@ -19,10 +19,15 @@ function load(url: string, { referrer = "", attrs = {} as Record<string, string>
   document.body.innerHTML = "";
 
   const sent: Sent[] = [];
+  // The anonymous visit count goes apart: the other tests follow the events.
+  const visits: Sent[] = [];
   // Without sendBeacon the tracker falls back to fetch, whose body is a string.
   Object.defineProperty(navigator, "sendBeacon", { value: undefined, configurable: true });
   const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
-    if (init?.method === "POST") sent.push(JSON.parse(String(init.body)));
+    if (init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      (body.type === "visit" ? visits : sent).push(body);
+    }
     return new Response(JSON.stringify({ whatsapp_code: true }));
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -49,9 +54,12 @@ function load(url: string, { referrer = "", attrs = {} as Record<string, string>
     document.addEventListener = add;
   }
 
-  const posted = () => fetchMock.mock.calls.filter(([u, init]) => init?.method === "POST" && u === "https://leadhub.test/api/collect");
+  const posted = () =>
+    fetchMock.mock.calls.filter(
+      ([u, init]) => init?.method === "POST" && u === "https://leadhub.test/api/collect" && !String(init.body).includes('"type":"visit"'),
+    );
   const flush = () => new Promise((r) => setTimeout(r, 0));
-  return { sent, posted, openMock, flush };
+  return { sent, visits, posted, openMock, flush };
 }
 
 function whatsappLink(href: string) {
@@ -274,6 +282,37 @@ describe("tracker.js", () => {
       await flush();
       expect(api.consentStatus()).toBe("granted");
       expect(sent.map((e) => e.type)).toEqual(["page_view"]);
+    });
+
+    it("counts every visit anonymously, even before or without consent", async () => {
+      const { visits, sent, flush } = load(
+        "/lp?utm_source=facebook&utm_medium=paid&utm_campaign=Gestantes&utm_content=Video1&fbclid=IwAR1&gclid=abc&email=a@b.com",
+        { referrer: "https://l.facebook.com/l.php?u=secret", attrs: { "data-consent": "banner" } },
+      );
+      await flush();
+      expect(sent).toEqual([]);
+      expect(visits).toHaveLength(1);
+      expect(visits[0]).toEqual({
+        key: "pk_test",
+        type: "visit",
+        visitor_id: "anonymous",
+        attribution: {
+          landing_url: "http://localhost:3000",
+          utm_source: "facebook",
+          utm_medium: "paid",
+          utm_campaign: "Gestantes",
+          utm_content: "Video1",
+          fbclid: "1",
+          gclid: "1",
+          referrer: "https://l.facebook.com",
+        },
+      });
+      expect(Object.keys(localStorage).filter((k) => k.startsWith("lh_"))).toEqual([]);
+
+      // Refusing does not undo the count, and accepting does not count twice.
+      button("Recusar").click();
+      await flush();
+      expect(visits).toHaveLength(1);
     });
 
     it("keeps the original behaviour on pages without the option", async () => {

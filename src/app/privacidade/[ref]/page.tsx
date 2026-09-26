@@ -72,6 +72,12 @@ export default async function PrivacyPage({ params }: PageProps<"/privacidade/[r
           </li>
         </ul>
         <p>Se você recusar os cookies, guardamos apenas o contato que você mesmo digitou para ser atendido.</p>
+        <p>
+          Com ou sem aceite, cada visita entra numa <strong>contagem anônima</strong> de visitantes por dia e por campanha, sem cookies e
+          sem nada guardado no seu navegador: o endereço IP e o tipo de navegador são transformados num código que não pode ser revertido,
+          usado só para contar cada pessoa uma vez por dia e apagado em até dois dias. Ficam apenas os números, que não identificam
+          ninguém.
+        </p>
       </Section>
 
       <Section title="3. Para que usamos e com qual base legal">

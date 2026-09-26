@@ -43,6 +43,54 @@ const post = (body: unknown, headers: Record<string, string> = {}) =>
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 
+describe("anonymous visits", () => {
+  const visit = {
+    key: "pk_ok",
+    type: "visit",
+    visitor_id: "anonymous",
+    attribution: { utm_source: "facebook", utm_medium: "paid", utm_campaign: "Gestantes", utm_content: "Video1", fbclid: "1", landing_url: "https://clinica.com.br" },
+  };
+
+  it("counts the visit with a hash of IP + browser and where it came from, never the raw values", async () => {
+    const countVisit = vi.fn(async () => undefined);
+    const d = deps({ countVisit });
+    const response = await handleCollect(post(visit, { "X-Real-IP": "200.1.2.3" }), d);
+    expect(response.status).toBe(200);
+    expect(d.collect).not.toHaveBeenCalled();
+    const [key, host, client, dims] = countVisit.mock.calls[0] as unknown as [string, string, string, Record<string, string>];
+    expect([key, host]).toEqual(["pk_ok", "clinica.com.br"]);
+    expect(client).toMatch(/^[0-9a-f]{64}$/);
+    expect(client).not.toContain("200.1.2.3");
+    expect(dims).toEqual({ channel: "meta_ads", campaign: "Gestantes", adset: "", ad: "Video1", device: "mobile" });
+    expect(JSON.stringify(d.logs)).not.toContain("Gestantes");
+
+    // Same person again: same hash (the database counts once a day).
+    await handleCollect(post(visit, { "X-Real-IP": "200.1.2.3" }), d);
+    expect((countVisit.mock.calls[1] as unknown as string[])[2]).toBe(client);
+    await handleCollect(post(visit, { "X-Real-IP": "200.1.2.4" }), d);
+    expect((countVisit.mock.calls[2] as unknown as string[])[2]).not.toBe(client);
+  });
+
+  it("ignores crawlers and requests without an IP", async () => {
+    const countVisit = vi.fn(async () => undefined);
+    const d = deps({ countVisit });
+    await handleCollect(post(visit, { "X-Real-IP": "200.1.2.3", "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1)" }), d);
+    await handleCollect(post(visit, { "User-Agent": "Mozilla/5.0 HeadlessChrome/120" }), d);
+    await handleCollect(post(visit), d);
+    expect(countVisit).not.toHaveBeenCalled();
+  });
+
+  it("classifies a visit from the referrer when there are no UTMs", async () => {
+    const countVisit = vi.fn(async () => undefined);
+    const d = deps({ countVisit });
+    await handleCollect(
+      post({ ...visit, attribution: { referrer: "https://www.google.com", landing_url: "https://clinica.com.br" } }, { "X-Real-IP": "200.1.2.3" }),
+      d,
+    );
+    expect((countVisit.mock.calls[0] as unknown as [string, string, string, { channel: string }])[3].channel).toBe("google_organic");
+  });
+});
+
 describe("POST /api/collect", () => {
   it("keeps only the typed contact when the visitor refused tracking", async () => {
     const d = deps();

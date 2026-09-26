@@ -25,8 +25,13 @@
  *   data-consent="banner"   -> shows a short consent banner (Aceitar/Recusar)
  *   data-consent="required" -> waits for LeadHub.consent(true|false) from the
  *                              page's own cookie banner
- * Until the visitor accepts, nothing is stored on the device and no visit or
- * origin is sent: a WhatsApp click sends only the contact the person typed.
+ * Until the visitor accepts, nothing is stored on the device and no visitor
+ * id or origin is sent with events: a WhatsApp click sends only the contact
+ * the person typed.
+ *
+ * Every page load (with or without consent) also sends one anonymous "visit"
+ * so the panel counts everyone who saw the page: no identifier and nothing
+ * stored in the browser, only the campaign names and the referring site.
  * Accepting also calls fbq('consent', 'grant') and gtag consent "granted".
  */
 (function () {
@@ -200,6 +205,10 @@
       event.url_params = urlParams;
     }
     if (CONSENT_MODE) event.consent = tracking;
+    post(event);
+  }
+
+  function post(event) {
     var body = JSON.stringify(event);
     try {
       // text/plain avoids a CORS preflight; sendBeacon survives navigation.
@@ -209,6 +218,29 @@
     try {
       fetch(ENDPOINT, { method: "POST", body: body, keepalive: true, headers: { "Content-Type": "text/plain" } });
     } catch (e) {}
+  }
+
+  // Anonymous visit, on every page load with or without consent, so the panel
+  // counts everyone who saw the page (a fair conversion rate). Nothing is
+  // stored in the browser and no identifier is sent: only where the visit came
+  // from (campaign names, whether an ad click id was present, the referring
+  // site). The server counts each person once a day without keeping who.
+  var VISIT_PARAMS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "campaign_name", "adset_name", "ad_name"];
+  var CLICK_IDS = ["gclid", "gbraid", "wbraid", "fbclid", "ttclid", "msclkid"];
+  function countVisit() {
+    var params = new URLSearchParams(landingUrl().split("?")[1] || "");
+    var source = { landing_url: window.location.origin };
+    VISIT_PARAMS.forEach(function (p) {
+      var v = params.get(p);
+      if (v) source[p] = v.slice(0, 200);
+    });
+    CLICK_IDS.forEach(function (p) {
+      if (params.get(p)) source[p] = "1";
+    });
+    try {
+      if (document.referrer) source.referrer = new URL(document.referrer).origin;
+    } catch (e) {}
+    post({ key: KEY, type: "visit", visitor_id: "anonymous", attribution: source });
   }
 
   function codeEnabled() {
@@ -550,6 +582,10 @@
   api.consentStatus = function () {
     return CONSENT_MODE ? choice || "pending" : "not_required";
   };
+
+  try {
+    countVisit();
+  } catch (e) {}
 
   function ready() {
     if (tracking) startTracking();

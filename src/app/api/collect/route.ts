@@ -7,6 +7,8 @@ const deps: CollectDeps = {
   collect: (key, originHost, event) =>
     call("lh_collect", { p_key: key, p_origin_host: originHost, p_event: event }),
   pageConfig: (key) => call("lh_page_config", { p_key: key }),
+  countVisit: (key, originHost, client, dims) =>
+    call("lh_count_visit", { p_key: key, p_origin_host: originHost, p_client: client, p_dims: dims }),
   log: (entry) => console.log(JSON.stringify({ ts: new Date().toISOString(), ...entry })),
   onNewLead: (leadId) => after(() => notifyNewLead(leadId)),
 };

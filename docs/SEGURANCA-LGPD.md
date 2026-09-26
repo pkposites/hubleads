@@ -50,6 +50,12 @@
 - **Painéis separados por gestor**: cada gestor vê só os próprios clientes; o
   master vê todos. Todas as funções do painel mãe conferem o dono do cliente
   antes de responder, e um teste automático percorre todas elas.
+- **Contagem anônima de visitantes**: toda visita (com ou sem aceite) conta
+  para o total de visitantes, sem cookie e sem identificador. O app transforma
+  IP + navegador num hash; o banco aplica um sal aleatório do dia, usa só para
+  contar cada pessoa uma vez por dia e apaga sal e hashes em até dois dias.
+  Ficam só contadores por dia, canal, campanha, conjunto, anúncio e aparelho
+  (`lh_visit_stats`). A política de privacidade informa isso.
 - **Senha do painel mãe**: cada admin troca a própria senha (pede a atual, com
   o mesmo limite de tentativas do login) e recupera por e-mail com link de uso
   único, válido 30 minutos, guardado só como hash e criado só pelo servidor

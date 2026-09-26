@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { classifyChannel } from "@/lib/attribution";
 import { isNoiseEvent } from "@/lib/lp-events";
@@ -83,6 +84,42 @@ export interface CollectDeps {
   log(entry: Record<string, unknown>): void;
   /** Runs after the response when a click created a new row (notifications). */
   onNewLead?(leadId: string): void;
+  /** Anonymous visit counter (lh_count_visit). */
+  countVisit?(key: string, originHost: string | null, client: string, dims: VisitDims): Promise<unknown>;
+}
+
+export interface VisitDims {
+  channel: string;
+  campaign: string;
+  adset: string;
+  ad: string;
+  device: string;
+}
+
+// Crawlers and headless browsers are not visitors (link previews do not run
+// the script at all).
+const BOT_RE = /bot|crawl|spider|slurp|facebookexternalhit|facebookcatalog|meta-externalagent|headless|lighthouse|pingdom|python|curl|wget|axios|node-fetch|go-http/i;
+
+const dim = (value: unknown, max = 200) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+
+/**
+ * Where an anonymous visit came from, from what the tracker read in the
+ * address (campaign names, whether a click id was present, the referring site).
+ */
+export function visitDims(attribution: Record<string, unknown> | null | undefined, userAgent: string | null): VisitDims {
+  const a = attribution ?? {};
+  const signals: Record<string, string> = {};
+  for (const key of ["utm_source", "utm_medium", "gclid", "gbraid", "wbraid", "fbclid", "ttclid", "msclkid", "referrer", "landing_url"]) {
+    const value = dim(a[key], 500);
+    if (value) signals[key] = value;
+  }
+  return {
+    channel: classifyChannel({ ...signals, landing_page_url: signals.landing_url }),
+    campaign: dim(a.campaign_name) || dim(a.utm_campaign),
+    adset: dim(a.adset_name) || dim(a.utm_term),
+    ad: dim(a.ad_name) || dim(a.utm_content),
+    device: deviceFrom(userAgent),
+  };
 }
 
 export const COLLECT_CORS = {
@@ -149,6 +186,7 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
   if (!parsed.success) return json(400, { error: "invalid event" });
 
   const event = parsed.data;
+  if (event.type === "visit") return handleVisit(request, event.key, event.attribution, deps, started);
   const refused = event.consent === false;
   if (event.type === "lp_event") {
     const name = typeof event.data?.event === "string" ? event.data.event : "";
@@ -194,6 +232,35 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
     const code = (error as { code?: string } | null)?.code;
     const status = code === "LH401" ? 401 : code === "LH403" ? 403 : code === "22023" ? 400 : 500;
     deps.log({ route: "POST /api/collect", type: event.type, status, error_code: code ?? "unknown" });
+    return json(status, { error: status === 500 ? "internal error" : code });
+  }
+}
+
+/**
+ * Anonymous visit (every page load, with or without consent): counts people
+ * once a day without identifiers. IP and browser are hashed here and never
+ * stored; the database salts the hash again with a salt deleted after two days.
+ */
+async function handleVisit(
+  request: Request,
+  key: string,
+  attribution: Record<string, unknown> | null | undefined,
+  deps: CollectDeps,
+  started: number,
+): Promise<Response> {
+  const userAgent = request.headers.get("user-agent");
+  const ip = clientIp(request);
+  if (!deps.countVisit || !ip || !userAgent || BOT_RE.test(userAgent)) return json(200, { ok: true, ignored: true });
+  const client = createHash("sha256").update(`${ip}|${userAgent}`).digest("hex");
+  const dims = visitDims(attribution, userAgent);
+  try {
+    await deps.countVisit(key, originHost(request), client, dims);
+    deps.log({ route: "POST /api/collect", type: "visit", status: 200, channel: dims.channel, latency_ms: Date.now() - started });
+    return json(200, { ok: true });
+  } catch (error) {
+    const code = (error as { code?: string } | null)?.code;
+    const status = code === "LH401" ? 401 : code === "LH403" ? 403 : code === "22023" ? 400 : 500;
+    deps.log({ route: "POST /api/collect", type: "visit", status, error_code: code ?? "unknown" });
     return json(status, { error: status === 500 ? "internal error" : code });
   }
 }

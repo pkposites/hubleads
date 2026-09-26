@@ -155,6 +155,13 @@ da LP e aparecem numa nota à parte. A seção **Atendimento** mostra a mediana
 do tempo até o primeiro contato, quantos foram respondidos em até 5 minutos e
 os motivos de perda.
 
+**Visitantes** contam todo mundo que abriu a LP, tenha aceitado os cookies ou
+não: o script manda uma visita anônima a cada carregamento (sem cookie nem
+identificador) e o servidor conta cada pessoa uma vez por dia, por canal,
+campanha, conjunto, anúncio e aparelho. Os visitantes de um período são a soma
+dos dias. Em dias anteriores a essa contagem, vale o número de quem aceitou os
+cookies.
+
 Todas as telas funcionam no celular: a planilha vira uma lista de cartões
 editáveis (com botão para abrir o WhatsApp do lead), e os gráficos mostram os
 números do dia ao tocar.
