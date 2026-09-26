@@ -79,13 +79,16 @@ export function cleanAnswers(data: Record<string, unknown> | null | undefined): 
 }
 
 export interface CollectDeps {
-  collect(key: string, originHost: string | null, event: Record<string, unknown>): Promise<Record<string, unknown>>;
+  /** client: keyed hash of the visitor's IP (see clientKey), for the sending limits. */
+  collect(key: string, originHost: string | null, event: Record<string, unknown>, client: string): Promise<Record<string, unknown>>;
   pageConfig(key: string): Promise<{ whatsapp_code: boolean } | null>;
   log(entry: Record<string, unknown>): void;
   /** Runs after the response when a click created a new row (notifications). */
   onNewLead?(leadId: string): void;
-  /** Anonymous visit counter (lh_count_visit). */
-  countVisit?(key: string, originHost: string | null, client: string, dims: VisitDims): Promise<unknown>;
+  /** Anonymous visit counter; visitor: hash of IP + browser (once a day per person). */
+  countVisit?(key: string, originHost: string | null, visitor: string, dims: VisitDims, client: string): Promise<{ limited?: boolean } | null>;
+  /** Keyed hash of the visitor's IP; the IP itself is never sent to the database. */
+  clientKey(ip: string | undefined): string;
 }
 
 export interface VisitDims {
@@ -200,6 +203,7 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
   }
 
   const channel = refused ? "sem_consentimento" : classifyChannel({ ...attribution, landing_page_url: attribution.landing_url });
+  const ip = clientIp(request);
   const device = deviceFrom(request.headers.get("user-agent"));
   const host = originHost(request);
 
@@ -219,11 +223,15 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
       attribution,
       url_params: refused ? {} : cleanAnswers(event.url_params),
       // Kept for Meta's Conversions API (client_ip_address / client_user_agent).
-      ip_address: refused ? undefined : clientIp(request),
+      ip_address: refused ? undefined : ip,
       user_agent: refused ? undefined : request.headers.get("user-agent")?.slice(0, 500) || undefined,
       consent: event.consent ?? undefined,
       data: cleanAnswers(event.data),
-    });
+    }, deps.clientKey(ip));
+    if (result.limited === true) {
+      deps.log({ route: "POST /api/collect", type: event.type, status: 429 });
+      return json(429, { error: "too many requests" });
+    }
     // Logs never carry names, codes or URLs (§15.2).
     deps.log({ route: "POST /api/collect", type: event.type, status: 200, channel, latency_ms: Date.now() - started });
     if (result.new_lead === true && typeof result.lead_id === "string") deps.onNewLead?.(result.lead_id);
@@ -251,10 +259,14 @@ async function handleVisit(
   const userAgent = request.headers.get("user-agent");
   const ip = clientIp(request);
   if (!deps.countVisit || !ip || !userAgent || BOT_RE.test(userAgent)) return json(200, { ok: true, ignored: true });
-  const client = createHash("sha256").update(`${ip}|${userAgent}`).digest("hex");
+  const visitor = createHash("sha256").update(`${ip}|${userAgent}`).digest("hex");
   const dims = visitDims(attribution, userAgent);
   try {
-    await deps.countVisit(key, originHost(request), client, dims);
+    const result = await deps.countVisit(key, originHost(request), visitor, dims, deps.clientKey(ip));
+    if (result?.limited === true) {
+      deps.log({ route: "POST /api/collect", type: "visit", status: 429 });
+      return json(429, { error: "too many requests" });
+    }
     deps.log({ route: "POST /api/collect", type: "visit", status: 200, channel: dims.channel, latency_ms: Date.now() - started });
     return json(200, { ok: true });
   } catch (error) {

@@ -50,6 +50,12 @@
 - **Painéis separados por gestor**: cada gestor vê só os próprios clientes; o
   master vê todos. Todas as funções do painel mãe conferem o dono do cliente
   antes de responder, e um teste automático percorre todas elas.
+- **Limite contra envio em massa** (`/api/collect`): os eventos da LP só entram
+  pelo servidor do app (segredo do servidor), com limite por aparelho (hash
+  com chave do IP, apagado em 2 horas): 120 eventos por minuto; cliques no
+  WhatsApp e contatos, 20 por minuto e 100 por hora; visitas, 60 por minuto.
+  Acima disso a resposta é 429 e nada é gravado. Chamadas diretas ao banco
+  com a chave pública não chegam às funções de gravação.
 - **Contagem anônima de visitantes**: toda visita (com ou sem aceite) conta
   para o total de visitantes, sem cookie e sem identificador. O app transforma
   IP + navegador num hash; o banco aplica um sal aleatório do dia, usa só para

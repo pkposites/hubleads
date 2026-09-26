@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { anon, collect, createPool, setupWorkspace, type Setup } from "./harness";
+import { anon, collect, createPool, SERVER_SECRET, setupWorkspace, type Setup } from "./harness";
 
 interface Metrics {
   totals: { visitors: number; clickers: number; leads: number };
@@ -17,7 +17,14 @@ describe("anonymous visit counts", () => {
   let ws: Setup;
 
   const count = (who: string, dims: Record<string, string> = meta, host = "clinica.com.br", key = ws.key) =>
-    anon(pool, "select lh_count_visit($1, $2, $3, $4) as r", [key, host, client(who), JSON.stringify(dims)]);
+    anon(pool, "select lh_server_count_visit($1, $2, $3, $4, $5, $6) as r", [
+      SERVER_SECRET,
+      randomUUID(),
+      key,
+      host,
+      client(who),
+      JSON.stringify(dims),
+    ]);
   const metrics = (dimension = "channel") => anon<Metrics>(pool, "select lh_metrics($1, null, $2) as r", [ws.token, dimension]);
   const stats = () => anon<{ visitors: number; clicks: number }>(pool, "select lh_stats($1, null) as r", [ws.token]);
 
@@ -81,9 +88,9 @@ describe("anonymous visit counts", () => {
     await expect(count("eva", meta, "clinica.com.br", "pk_nao_existe")).rejects.toMatchObject({ code: "LH401" });
     await pool.query("update lh_pages set domains = '{clinica.com.br}' where id = $1", [ws.pageId]);
     await expect(count("eva", meta, "outro.com")).rejects.toMatchObject({ code: "LH403" });
-    await expect(anon(pool, "select lh_count_visit($1, 'clinica.com.br', '200.1.2.3', '{}') as r", [ws.key])).rejects.toMatchObject({
-      code: "22023",
-    });
+    await expect(
+      anon(pool, "select lh_server_count_visit($1, 'x', $2, 'clinica.com.br', '200.1.2.3', '{}') as r", [SERVER_SECRET, ws.key]),
+    ).rejects.toMatchObject({ code: "22023" });
     await expect(anon(pool, "select count(*) as r from lh_visit_stats")).rejects.toMatchObject({ code: "42501" });
   });
 });

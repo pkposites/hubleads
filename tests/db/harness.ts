@@ -70,11 +70,15 @@ export interface CollectEvent {
   consent?: boolean;
 }
 
-export const collect = (pool: Pool, key: string, event: CollectEvent, host = "clinica.com.br") =>
-  anon<{ ok: boolean; lead_id?: string; code?: string; new_lead?: boolean }>(
+/** Same secret global-setup stores in the database. */
+export const SERVER_SECRET = "test-server-secret-0123456789abcdef";
+
+/** Sends an event like the app's server does; each call is a different device unless `client` is given. */
+export const collect = (pool: Pool, key: string, event: CollectEvent, host = "clinica.com.br", client: string = randomUUID()) =>
+  anon<{ ok: boolean; lead_id?: string; code?: string; new_lead?: boolean; limited?: boolean }>(
     pool,
-    "select lh_collect($1, $2, $3) as r",
-    [key, host, JSON.stringify(event)],
+    "select lh_server_collect($1, $2, $3, $4, $5) as r",
+    [SERVER_SECRET, client, key, host, JSON.stringify(event)],
   );
 
 export interface LeadRow {

@@ -8,6 +8,7 @@ function deps(overrides: Partial<CollectDeps> = {}) {
     collect: vi.fn(async () => ({ ok: true, code: "7F3K" })),
     pageConfig: vi.fn(async (key: string) => (key === "pk_ok" ? { whatsapp_code: true } : null)),
     log: (e) => logs.push(e),
+    clientKey: (ip) => (ip ? `k-${ip}` : ""),
     ...overrides,
   };
   return d;
@@ -52,7 +53,7 @@ describe("anonymous visits", () => {
   };
 
   it("counts the visit with a hash of IP + browser and where it came from, never the raw values", async () => {
-    const countVisit = vi.fn(async () => undefined);
+    const countVisit = vi.fn<NonNullable<CollectDeps["countVisit"]>>(async () => null);
     const d = deps({ countVisit });
     const response = await handleCollect(post(visit, { "X-Real-IP": "200.1.2.3" }), d);
     expect(response.status).toBe(200);
@@ -71,8 +72,16 @@ describe("anonymous visits", () => {
     expect((countVisit.mock.calls[2] as unknown as string[])[2]).not.toBe(client);
   });
 
+  it("passes the device key for the limits and answers 429 over the limit", async () => {
+    const countVisit = vi.fn<NonNullable<CollectDeps["countVisit"]>>(async () => ({ limited: true }));
+    const d = deps({ countVisit });
+    const response = await handleCollect(post(visit, { "X-Real-IP": "200.1.2.3" }), d);
+    expect(response.status).toBe(429);
+    expect(countVisit.mock.calls[0][4]).toBe("k-200.1.2.3");
+  });
+
   it("ignores crawlers and requests without an IP", async () => {
-    const countVisit = vi.fn(async () => undefined);
+    const countVisit = vi.fn<NonNullable<CollectDeps["countVisit"]>>(async () => null);
     const d = deps({ countVisit });
     await handleCollect(post(visit, { "X-Real-IP": "200.1.2.3", "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1)" }), d);
     await handleCollect(post(visit, { "User-Agent": "Mozilla/5.0 HeadlessChrome/120" }), d);
@@ -81,7 +90,7 @@ describe("anonymous visits", () => {
   });
 
   it("classifies a visit from the referrer when there are no UTMs", async () => {
-    const countVisit = vi.fn(async () => undefined);
+    const countVisit = vi.fn<NonNullable<CollectDeps["countVisit"]>>(async () => null);
     const d = deps({ countVisit });
     await handleCollect(
       post({ ...visit, attribution: { referrer: "https://www.google.com", landing_url: "https://clinica.com.br" } }, { "X-Real-IP": "200.1.2.3" }),
@@ -92,6 +101,15 @@ describe("anonymous visits", () => {
 });
 
 describe("POST /api/collect", () => {
+  it("answers 429 when the device went over the sending limits", async () => {
+    const collect = vi.fn<CollectDeps["collect"]>(async () => ({ limited: true }));
+    const d = deps({ collect });
+    const response = await handleCollect(post(event, { "X-Real-IP": "200.1.2.3" }), d);
+    expect(response.status).toBe(429);
+    expect(collect.mock.calls[0][3]).toBe("k-200.1.2.3");
+    expect(d.logs).toEqual([{ route: "POST /api/collect", type: "whatsapp_click", status: 429 }]);
+  });
+
   it("keeps only the typed contact when the visitor refused tracking", async () => {
     const d = deps();
     await handleCollect(

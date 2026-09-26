@@ -48,6 +48,8 @@ export default async function setup(project: TestProject) {
         throw new Error(`Migration ${file} failed: ${(error as Error).message}`);
       }
     }
+    // Events go through lh_server_collect, which needs the server secret.
+    await db.query("select lh_private.set_server_secret('test-server-secret-0123456789abcdef')");
   } finally {
     await db.end();
   }

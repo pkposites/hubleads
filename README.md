@@ -7,7 +7,7 @@ preencher, porque o visitante vai direto para o WhatsApp sem formulário.
 ## Como funciona
 
 ```
-Landing Page + tracker.js ──► /api/collect ──► lh_collect() ──► planilha
+Landing Page + tracker.js ──► /api/collect ──► lh_server_collect() ──► planilha
   UTMs, gclid, fbclid,           (Next.js)      (Supabase)       atendente preenche
   cookies do pixel da Meta,                                      telefone, status,
   visitas e cliques no WhatsApp                                  valor e observações

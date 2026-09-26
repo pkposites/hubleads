@@ -24,6 +24,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - The app uses only the publishable key, through `call()` in `src/lib/db.ts`.
   Server-only functions (`lh_server_*`: push targets, Meta token) also need
   `LH_SERVER_SECRET` (`src/lib/server.ts`); never call them from client code.
+- `/api/collect` calls only `lh_server_collect` / `lh_server_count_visit`
+  (server secret + sending limits per device); `lh_collect` and
+  `lh_count_visit` live in `lh_private` and are not callable from the API.
 - Never log names, phones, codes or raw payloads.
 - Secrets saved in the database (the Meta token) are encrypted by the app with
   `encryptSecret` (`src/lib/crypto.ts`, key `LH_ENCRYPTION_KEY`); the database
