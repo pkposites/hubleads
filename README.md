@@ -75,7 +75,10 @@ Detalhes e pendências em [docs/SEGURANCA-LGPD.md](docs/SEGURANCA-LGPD.md).
   exemplo, testes) com uma etapa de confirmação. Há dois papéis:
   - **master**: vê todos os clientes e cria, desativa ou troca a senha dos
     gestores (menu **Gestores**). Também escolhe o gestor responsável de cada
-    cliente. O master é criado no banco:
+    cliente e pode **apagar um cliente** (Zona de perigo, no fim da página do
+    cliente): é preciso digitar o nome dele e confirmar; tudo do cliente é
+    apagado (LPs, leads, histórico, configurações) e fica só um registro na
+    auditoria (quem, quando, quantos leads). O master é criado no banco:
     ```sql
     select lh_private.create_admin('email@exemplo.com', '<senha com 10+ caracteres>');
     ```

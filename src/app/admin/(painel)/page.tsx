@@ -6,8 +6,9 @@ import { formatDateTime, isWithinDays, timeSince } from "@/lib/format";
 import { dbLimitMb, evaluateInfra, type InfraNumbers } from "@/lib/infra";
 import { InfraAlert } from "./infra-alert";
 
-export default async function AdminHome() {
+export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   const { token, role } = await requireAdmin();
+  const deleted = (await searchParams).apagado;
   const isMaster = role === "master";
   const [clients, infra] = await Promise.all([
     call<ClientSummary[]>("lh_admin_list_workspaces", { p_token: token }),
@@ -16,6 +17,11 @@ export default async function AdminHome() {
 
   return (
     <div className="flex flex-col gap-4">
+      {typeof deleted === "string" && deleted && (
+        <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800" role="status">
+          Cliente &quot;{deleted}&quot; apagado.
+        </p>
+      )}
       {infra && <InfraAlert status={evaluateInfra(infra, dbLimitMb())} numbers={infra} />}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Clientes</h1>

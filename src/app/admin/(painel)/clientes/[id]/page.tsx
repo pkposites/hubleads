@@ -9,7 +9,7 @@ import type { LeadEvent } from "@/lib/leads";
 import { eventLabel } from "@/lib/lp-events";
 import { openClientSheet } from "../../../actions";
 import { encryptionKey, serverSecret } from "@/lib/server";
-import { AddPageForm, OwnerForm, PageSettings, ResetPassword } from "./client-actions";
+import { AddPageForm, DeleteClient, OwnerForm, PageSettings, ResetPassword } from "./client-actions";
 import { MetaSettings, type MetaSettingsData } from "./meta-settings";
 import { PrivacySettings } from "./privacy-settings";
 import type { PrivacySettings as PrivacyData } from "@/lib/privacy";
@@ -154,6 +154,12 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
           </div>
         )}
       </Card>
+
+      {role === "master" && (
+        <Card title="Zona de perigo" className="border-red-200">
+          <DeleteClient workspaceId={client.id} name={client.name} leads={client.leads_total} />
+        </Card>
+      )}
     </div>
   );
 }

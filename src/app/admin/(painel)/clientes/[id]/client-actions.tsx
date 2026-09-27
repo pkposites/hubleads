@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { Button, Field, FormMessage, inputClass } from "@/components/ui";
 import type { Page } from "@/lib/leads";
-import { addPage, resetPassword, transferClient, updatePageSettings } from "../../../actions";
+import { addPage, deleteClient, resetPassword, transferClient, updatePageSettings } from "../../../actions";
 import { AccessCard } from "../../access-card";
 
 export function ResetPassword({ origin, id, name, slug }: { origin: string; id: string; name: string; slug: string }) {
@@ -95,6 +95,61 @@ export function OwnerForm({
         {pending ? "Salvando..." : "Salvar"}
       </Button>
       <FormMessage state={state} />
+    </form>
+  );
+}
+
+/** Master only: deletes the client after typing its exact name and confirming. */
+export function DeleteClient({ workspaceId, name, leads }: { workspaceId: string; name: string; leads: number }) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [state, action, pending] = useActionState(deleteClient.bind(null, workspaceId), undefined);
+  const matches = typed.trim().toLowerCase() === name.trim().toLowerCase();
+
+  if (!open) {
+    return (
+      <div className="flex flex-col items-start gap-2 text-sm">
+        <p className="text-zinc-600">Apaga o cliente, as Landing Pages, os leads e o histórico. Não tem como desfazer.</p>
+        <Button variant="danger" onClick={() => setOpen(true)}>
+          Apagar cliente...
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <form
+      action={action}
+      onSubmit={(e) => {
+        if (!window.confirm(`Apagar "${name}" e ${leads} ${leads === 1 ? "lead" : "leads"} de vez? Não tem como desfazer.`)) e.preventDefault();
+      }}
+      className="flex flex-col gap-3 text-sm"
+    >
+      <p className="rounded-md bg-red-50 px-3 py-2 text-red-800">
+        Isso apaga <strong>{name}</strong> por completo: Landing Pages (o código instalado nelas para de funcionar), {leads}{" "}
+        {leads === 1 ? "lead" : "leads"}, histórico, métricas, configurações da Meta e o acesso do atendente. Se precisar dos dados,
+        exporte a planilha antes.
+      </p>
+      <Field label={`Para confirmar, digite o nome do cliente: ${name}`}>
+        <input
+          name="confirm_name"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          autoComplete="off"
+          className={inputClass}
+        />
+      </Field>
+      <FormMessage state={state} />
+      <div className="flex gap-2">
+        <Button type="submit" variant="danger" disabled={!matches || pending}>
+          {pending ? "Apagando..." : "Apagar cliente de vez"}
+        </Button>
+        <Button type="button" variant="secondary" onClick={() => {
+            setOpen(false);
+            setTyped("");
+          }}>
+          Cancelar
+        </Button>
+      </div>
     </form>
   );
 }

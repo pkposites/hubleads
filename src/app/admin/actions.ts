@@ -340,3 +340,18 @@ export async function transferClient(workspaceId: string, _prev: AdminFormState,
   revalidatePath("/admin");
   return { ok: "Responsável atualizado." };
 }
+
+/** Master only: deletes the client and everything of it, after typing its name. */
+export async function deleteClient(workspaceId: string, _prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  const { token } = await requireAdmin();
+  const name = String(formData.get("confirm_name") ?? "");
+  try {
+    await call("lh_admin_delete_workspace", { p_token: token, p_workspace_id: workspaceId, p_confirm_name: name });
+  } catch (error) {
+    if (error instanceof DbError && error.code === "22023") return { error: "O nome digitado não é igual ao nome do cliente." };
+    if (error instanceof DbError && error.code === "LH403") return { error: "Só o master pode apagar clientes." };
+    return { error: "Não foi possível apagar o cliente." };
+  }
+  revalidatePath("/admin");
+  redirect(`/admin?apagado=${encodeURIComponent(name.trim())}`);
+}
