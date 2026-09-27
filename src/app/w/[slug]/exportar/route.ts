@@ -1,7 +1,8 @@
 import type { NextRequest } from "next/server";
 import { CHANNELS } from "@/lib/attribution";
 import { call } from "@/lib/db";
-import { isStatus, leadsToCsv, PERIODS, periodStart, type Lead } from "@/lib/leads";
+import { isStatus, leadsToCsv, type Lead } from "@/lib/leads";
+import { periodArgs, resolvePeriod } from "@/lib/period";
 import { currentSession } from "@/lib/session";
 
 export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exportar">) {
@@ -12,7 +13,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
   }
 
   const sp = request.nextUrl.searchParams;
-  const period = (sp.get("periodo") ?? "tudo") in PERIODS ? (sp.get("periodo") ?? "tudo") : "tudo";
+  // Without a period in the address, the export has all the history.
+  const period = resolvePeriod({ periodo: sp.get("periodo") ?? "tudo", de: sp.get("de") ?? undefined, ate: sp.get("ate") ?? undefined });
   const status = sp.get("status");
   const channel = sp.get("origem");
 
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
   for (let offset = 0; offset < 50_000; offset += 1000) {
     const page = await call<{ total: number; rows: Lead[] }>("lh_list_leads", {
       p_token: session.token,
-      p_since: periodStart(period)?.toISOString() ?? null,
+      ...periodArgs(period),
       p_status: isStatus(status) ? status : null,
       p_channel: channel && channel in CHANNELS ? channel : null,
       p_search: sp.get("q") || null,
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
   await call("lh_log_export", {
     p_token: session.token,
     p_rows: rows.length,
-    p_filters: { periodo: period, status: status ?? null, origem: channel ?? null, busca: Boolean(sp.get("q")) },
+    p_filters: { ...period.query, status: status ?? null, origem: channel ?? null, busca: Boolean(sp.get("q")) },
   });
 
   const date = new Date().toISOString().slice(0, 10);

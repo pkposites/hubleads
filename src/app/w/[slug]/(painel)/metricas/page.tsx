@@ -5,8 +5,6 @@ import {
   DIMENSIONS,
   formatMinutes,
   formatRate,
-  PERIODS,
-  periodStart,
   rate,
   type AttendanceMetrics,
   type Dimension,
@@ -16,6 +14,10 @@ import {
 import { eventLabel, type LpEventMetric } from "@/lib/lp-events";
 import { requireWorkspace } from "@/lib/session";
 import { PillLinks } from "../period-tabs";
+import { PeriodPicker } from "../period-picker";
+import { TrendLine } from "@/components/trend";
+import { countTrend, formatRange, periodArgs, rateTrend, resolvePeriod, type Trend } from "@/lib/period";
+import type { Stats } from "@/lib/leads";
 import { DailyCharts } from "./daily-charts";
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -29,11 +31,12 @@ function Meter({ value, label }: { value: number | null; label: string }) {
   );
 }
 
-function Tile({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function Tile({ label, value, hint, trend }: { label: string; value: string | number; hint?: string; trend?: Trend | null }) {
   return (
     <div className="rounded-lg border border-zinc-200 bg-white px-4 py-3">
       <div className="text-xs text-zinc-500">{label}</div>
       <div className="text-xl font-semibold">{value}</div>
+      <TrendLine trend={trend ?? null} />
       {hint && <div className="text-xs text-zinc-500">{hint}</div>}
     </div>
   );
@@ -49,22 +52,24 @@ function rowLabel(dimension: Dimension, key: string) {
 export default async function MetricsPage({ params, searchParams }: PageProps<"/w/[slug]/metricas">) {
   const { slug } = await params;
   const sp = await searchParams;
-  const period = first(sp.periodo) in PERIODS ? first(sp.periodo) : "30d";
+  const period = resolvePeriod({ periodo: first(sp.periodo), de: first(sp.de), ate: first(sp.ate) });
   const dimension = (first(sp.por) in DIMENSIONS ? first(sp.por) : "channel") as Dimension;
   const { token } = await requireWorkspace(slug);
 
-  const since = periodStart(period)?.toISOString() ?? null;
-  const [metrics, attendance, lpEvents] = await Promise.all([
-    call<Metrics>("lh_metrics", { p_token: token, p_since: since, p_dimension: dimension }),
-    call<AttendanceMetrics>("lh_attendance_metrics", { p_token: token, p_since: since }),
-    call<LpEventMetric[]>("lh_lp_event_metrics", { p_token: token, p_since: since }),
+  const args = periodArgs(period);
+  const [metrics, attendance, lpEvents, previous] = await Promise.all([
+    call<Metrics>("lh_metrics", { p_token: token, ...args, p_dimension: dimension }),
+    call<AttendanceMetrics>("lh_attendance_metrics", { p_token: token, ...args }),
+    call<LpEventMetric[]>("lh_lp_event_metrics", { p_token: token, ...args }),
+    period.previous ? call<Stats>("lh_stats", { p_token: token, ...periodArgs(period.previous) }) : null,
   ]);
   const within5 = rate(attendance.within_5_min, attendance.contacted);
   const lostTotal = attendance.lost_reasons.reduce((sum, r) => sum + r.count, 0);
   const t = metrics.totals;
   const conversion = rate(t.clickers, t.visitors);
   const href = (changes: Record<string, string>) =>
-    `/w/${slug}/metricas?${new URLSearchParams({ periodo: period, por: dimension, ...changes })}`;
+    `/w/${slug}/metricas?${new URLSearchParams({ ...period.query, por: dimension, ...changes })}`;
+  const compareText = period.previous ? formatRange(period.previous) : null;
 
   const funnel: { label: string; value: number; hint?: string }[] = [
     { label: "Visitaram a LP", value: t.visitors },
@@ -77,11 +82,23 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">
-      <PillLinks label="Período" options={PERIODS} active={period} href={(k) => href({ periodo: k })} />
+      <PeriodPicker
+        period={period.key}
+        from={period.from}
+        to={period.to}
+        rangeText={period.key === "tudo" ? "Todo o histórico" : formatRange(period)}
+        compareText={compareText}
+      />
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5">
         <div className="text-sm text-zinc-600">Taxa de conversão da LP</div>
         <div className="mt-1 text-5xl font-semibold tracking-tight sm:text-6xl">{formatRate(conversion)}</div>
+        {previous && (
+          <div className="mt-1 flex items-center gap-1.5">
+            <TrendLine trend={rateTrend(conversion, rate(previous.clicks, previous.visitors))} />
+            <span className="text-xs text-zinc-500">vs {compareText} ({formatRate(rate(previous.clicks, previous.visitors))})</span>
+          </div>
+        )}
         <p className="mt-1 text-sm text-zinc-600">
           {t.visitors === 0
             ? "Ainda não há visitas neste período."
@@ -93,16 +110,23 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
       </section>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Tile label="Visitantes" value={t.visitors.toLocaleString("pt-BR")} />
+        <Tile label="Visitantes" value={t.visitors.toLocaleString("pt-BR")} trend={previous && countTrend(t.visitors, previous.visitors)} />
         <Tile
           label="Clicaram no WhatsApp"
           value={t.clickers.toLocaleString("pt-BR")}
+          trend={previous && countTrend(t.clickers, previous.clicks)}
           hint={t.clicks > t.clickers ? `${t.clicks} cliques no total` : undefined}
         />
-        <Tile label="Com telefone" value={t.with_phone} hint={`${formatRate(rate(t.with_phone, t.leads))} dos leads`} />
+        <Tile
+          label="Com telefone"
+          value={t.with_phone}
+          trend={previous && countTrend(t.with_phone, previous.with_phone)}
+          hint={`${formatRate(rate(t.with_phone, t.leads))} dos leads`}
+        />
         <Tile
           label="Vendas"
           value={t.sales}
+          trend={previous && countTrend(t.sales, previous.sales)}
           hint={t.sales ? `${formatMoney(t.revenue)} · ${formatRate(rate(t.sales, t.visitors))} dos visitantes` : undefined}
         />
       </div>

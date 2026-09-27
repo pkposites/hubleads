@@ -158,6 +158,13 @@ da LP e aparecem numa nota à parte. A seção **Atendimento** mostra a mediana
 do tempo até o primeiro contato, quantos foram respondidos em até 5 minutos e
 os motivos de perda.
 
+**Período**: no topo da planilha e das Métricas (Hoje, Ontem, Últimos 7 e 30
+dias, Este mês, Mês passado, Personalizado e Tudo), sempre em dias inteiros no
+horário de Brasília. Os quadrinhos dizem o intervalo e comparam com o mesmo
+tamanho imediatamente antes ("Este mês" com os mesmos dias do mês passado):
+▲/▼ em % para contagens e em pontos percentuais para a taxa de conversão. O
+período acompanha os filtros, o link para as Métricas e a exportação.
+
 **Visitantes** contam todo mundo que abriu a LP, tenha aceitado os cookies ou
 não: o script manda uma visita anônima a cada carregamento (sem cookie nem
 identificador) e o servidor conta cada pessoa uma vez por dia, por canal,

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/ui";
 import { call } from "@/lib/db";
-import { formatMinutes, periodStart, rate, formatRate, type AttendanceMetrics, type Lead, type Queue } from "@/lib/leads";
+import { formatMinutes, rate, formatRate, type AttendanceMetrics, type Lead, type Queue } from "@/lib/leads";
+import { periodArgs, resolvePeriod } from "@/lib/period";
 import { requireWorkspace } from "@/lib/session";
 import { LeadCard } from "../lead-sheet";
 
@@ -42,7 +43,7 @@ export default async function QueuePage({ params }: PageProps<"/w/[slug]/atender
   const { token } = await requireWorkspace(slug);
   const [queue, today] = await Promise.all([
     call<Queue>("lh_queue", { p_token: token }),
-    call<AttendanceMetrics>("lh_attendance_metrics", { p_token: token, p_since: periodStart("hoje")?.toISOString() }),
+    call<AttendanceMetrics>("lh_attendance_metrics", { p_token: token, ...periodArgs(resolvePeriod({ periodo: "hoje" })) }),
   ]);
   const ids = [...queue.waiting, ...queue.overdue, ...queue.today].map((l) => l.id);
   const lpEvents = ids.length ? await call<Record<string, string[]>>("lh_lead_lp_events", { p_token: token, p_lead_ids: ids }) : {};

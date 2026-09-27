@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { answerEntries, answerLabel, leadsToCsv, parseMoney, periodStart, type Lead } from "@/lib/leads";
+import { answerEntries, answerLabel, leadsToCsv, parseMoney, type Lead } from "@/lib/leads";
 
 describe("parseMoney", () => {
   it.each([
@@ -11,17 +11,6 @@ describe("parseMoney", () => {
     ["-5", "invalid"],
   ])("%j -> %j", (raw, expected) => {
     expect(parseMoney(raw)).toBe(expected);
-  });
-});
-
-describe("periodStart", () => {
-  const now = new Date("2026-09-24T02:00:00Z"); // 23:00 of the 23rd in São Paulo
-  it("starts 'hoje' at midnight in São Paulo", () => {
-    expect(periodStart("hoje", now)?.toISOString()).toBe("2026-09-23T03:00:00.000Z");
-  });
-  it("counts days back for 7d/30d and has no start for 'tudo'", () => {
-    expect(periodStart("7d", now)?.toISOString()).toBe("2026-09-17T02:00:00.000Z");
-    expect(periodStart("tudo", now)).toBeNull();
   });
 });
 

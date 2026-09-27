@@ -150,26 +150,6 @@ export interface Page {
   created_at: string;
 }
 
-export const PERIODS = {
-  hoje: "Hoje",
-  "7d": "7 dias",
-  "30d": "30 dias",
-  tudo: "Tudo",
-} as const;
-
-export type Period = keyof typeof PERIODS;
-
-export function periodStart(period: string, now = new Date()): Date | null {
-  if (period === "tudo") return null;
-  if (period === "hoje") {
-    // Midnight in São Paulo (UTC-3, no DST since 2019).
-    const sp = new Date(now.getTime() - 3 * 3_600_000);
-    return new Date(Date.UTC(sp.getUTCFullYear(), sp.getUTCMonth(), sp.getUTCDate(), 3));
-  }
-  const days = period === "7d" ? 7 : 30;
-  return new Date(now.getTime() - days * 86_400_000);
-}
-
 /** "18.000,50" / "18000.5" / "R$ 18.000" -> 18000.5; null when empty or invalid. */
 export function parseMoney(raw: string): number | null | "invalid" {
   const cleaned = raw.replace(/[R$\s]/g, "");
