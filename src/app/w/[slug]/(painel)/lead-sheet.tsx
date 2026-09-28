@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui";
 import { channelLabel } from "@/lib/attribution";
+import { sourceLabel } from "@/lib/source-labels";
 import { formatDateTime, timeSince } from "@/lib/format";
 import { adNames, answerEntries, answerLabel, type Lead } from "@/lib/leads";
 import { deleteLeads } from "../actions";
@@ -66,7 +67,10 @@ export function LeadCard({
             </span>
           )}
         </div>
-        <span className="shrink-0 text-xs text-zinc-600">{channelLabel(lead.channel)}</span>
+        <span className="shrink-0 text-right text-xs text-zinc-600">
+          {channelLabel(lead.channel)}
+          <span className="block text-zinc-500">{sourceLabel(lead.source)}</span>
+        </span>
       </div>
       {waiting && (names.ad || names.campaign) && (
         <p className="mt-1 truncate text-xs text-zinc-500">Anúncio: {names.ad ?? names.campaign}</p>
@@ -248,7 +252,7 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
               </th>
             )}
             {[
-              "Clique",
+              "Entrada",
               "Cód.",
               "Nome",
               "Telefone",
@@ -330,7 +334,10 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
                   </dl>
                 )}
               </td>
-              <td className="whitespace-nowrap px-2 py-1.5">{channelLabel(lead.channel)}</td>
+              <td className="whitespace-nowrap px-2 py-1.5">
+                {channelLabel(lead.channel)}
+                <div className="text-xs text-zinc-500">{sourceLabel(lead.source)}</div>
+              </td>
               <td className="max-w-48 px-2 py-1.5 text-xs">
                 <div className="break-words">{muted(adNames(lead).campaign)}</div>
                 {lead.campaign_id && <div className="font-mono text-zinc-500">#{lead.campaign_id}</div>}

@@ -30,7 +30,7 @@ describe("leadsToCsv", () => {
 
   it("writes a BOM, semicolons, quoted cells and Portuguese labels", () => {
     const csv = leadsToCsv([lead]);
-    expect(csv.startsWith("﻿Data/hora do clique;Código;Nome;Telefone;Status")).toBe(true);
+    expect(csv.startsWith("﻿Data/hora de entrada;Fonte;Código;Nome;Telefone;Status")).toBe(true);
     const row = csv.split("\r\n")[1];
     expect(row).toContain('"Maria ""Mah""; Souza"');
     expect(row).toContain(";Venda;18000;");

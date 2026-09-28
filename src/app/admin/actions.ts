@@ -4,7 +4,8 @@ import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
+import { appOrigin, requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
+import { appsScript } from "@/lib/lead-sources";
 import { clientIp } from "@/lib/collect";
 import { sendTestConversion } from "@/lib/conversions";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
@@ -486,6 +487,56 @@ export async function setLeadFormEnabled(
       p_form_name: form.form_name ?? "",
       p_enabled: enabled,
       p_since: Math.floor(Date.now() / 1000),
+    });
+  } catch {
+    return { error: "Não foi possível alterar." };
+  }
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// Lead sources: Google Sheets (Apps Script)
+// ---------------------------------------------------------------------------
+
+/** Creates a Sheets source and returns the Apps Script with its key (shown once). */
+export async function createSheetSource(workspaceId: string, name: string): Promise<{ script?: string; error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    const created = await call<{ id: string; key: string }>("lh_admin_create_source", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_kind: "sheets",
+      p_name: name.trim().slice(0, 120) || "Google Sheets",
+    });
+    revalidatePath(`/admin/clientes/${workspaceId}`);
+    return { script: appsScript(`${await appOrigin()}/api/sources/sheets`, created.key) };
+  } catch {
+    return { error: "Não foi possível criar a conexão." };
+  }
+}
+
+/** New key (the old script stops working) and the script to paste again. */
+export async function rotateSheetSourceKey(workspaceId: string, sourceId: string): Promise<{ script?: string; error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    const key = await call<string>("lh_admin_rotate_source_key", { p_token: token, p_workspace_id: workspaceId, p_source_id: sourceId });
+    revalidatePath(`/admin/clientes/${workspaceId}`);
+    return { script: appsScript(`${await appOrigin()}/api/sources/sheets`, key) };
+  } catch {
+    return { error: "Não foi possível gerar a nova chave." };
+  }
+}
+
+export async function updateSheetSource(workspaceId: string, sourceId: string, change: { enabled?: boolean; remove?: boolean }): Promise<{ error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    await call("lh_admin_update_source", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_source_id: sourceId,
+      p_enabled: change.enabled ?? null,
+      p_delete: change.remove ?? false,
     });
   } catch {
     return { error: "Não foi possível alterar." };

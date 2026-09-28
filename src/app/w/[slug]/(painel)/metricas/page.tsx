@@ -18,6 +18,7 @@ import { PeriodPicker } from "../period-picker";
 import { TrendLine } from "@/components/trend";
 import { countTrend, formatRange, periodArgs, rateTrend, resolvePeriod, type Trend } from "@/lib/period";
 import type { Stats } from "@/lib/leads";
+import { sourceLabel } from "@/lib/source-labels";
 import { DailyCharts } from "./daily-charts";
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -132,7 +133,7 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
       </div>
 
       <section className="rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="mb-4 text-sm font-semibold">Funil</h2>
+        <h2 className="mb-4 text-sm font-semibold">Funil da landing page</h2>
         <ol className="flex flex-col gap-3">
           {funnel.map((step, i) => {
             const prev = i > 0 ? funnel[i - 1].value : null;
@@ -164,6 +165,39 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
           </p>
         )}
       </section>
+
+      {(metrics.by_source ?? []).length > 0 && (
+        <section className="rounded-lg border border-zinc-200 bg-white p-5">
+          <h2 className="text-sm font-semibold">Leads por fonte</h2>
+          <p className="mb-3 text-xs text-zinc-500">Todas as entradas do período: landing page, formulários, planilhas e leads manuais.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-zinc-500">
+                <tr>
+                  {["Fonte", "Leads", "Com telefone", "Agendaram", "Compraram", "Faturamento", "Agendamento"].map((h, i) => (
+                    <th key={h} className={`py-1.5 pr-4 font-medium ${i > 0 ? "text-right" : ""}`}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {(metrics.by_source ?? []).map((row) => (
+                  <tr key={row.source}>
+                    <td className="py-2 pr-4 font-medium">{sourceLabel(row.source)}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{row.leads}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{row.with_phone}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{row.scheduled}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{row.sales}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{formatMoney(row.revenue)}</td>
+                    <td className="py-2 text-right tabular-nums">{formatRate(rate(row.scheduled, row.leads))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-5">
         <div>

@@ -10,9 +10,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Lead Hub project notes
 
-- Product: a landing page script (`public/tracker.js`) sends visits and WhatsApp
-  clicks to `/api/collect`; each click becomes a row in a spreadsheet-style panel
-  where the attendant fills in the phone. There is no phone capture on the page.
+- Product: a hub of lead sources per client, all landing in one spreadsheet-style
+  panel and attendance queue (`lh_leads.source`: lp, meta_form, sheets, manual).
+  Landing pages: `public/tracker.js` sends visits and WhatsApp clicks to
+  `/api/collect` (the attendant fills in the phone). Google Sheets: an Apps
+  Script (`appsScript()` in `src/lib/lead-sources.ts`) posts new rows to
+  `/api/sources/sheets` with a per-source key (`lh_lead_sources`, hash only).
 - Commands: `npm run lint`, `npm run typecheck`, `npm test` (unit, incl. the
   tracker under jsdom), `npm run test:db` (needs `TEST_DATABASE_URL`, see README),
   `npm run build`.

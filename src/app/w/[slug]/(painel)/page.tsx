@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { buttonClass, controlClass, EmptyState } from "@/components/ui";
 import { CHANNELS } from "@/lib/attribution";
+import { SOURCE_LABELS, sourceLabel } from "@/lib/source-labels";
 import { call } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
 import { formatRate, isStatus, rate, STATUSES, type Lead, type Stats } from "@/lib/leads";
@@ -30,6 +31,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
   const period = resolvePeriod({ periodo: first(sp.periodo), de: first(sp.de), ate: first(sp.ate) });
   const status = isStatus(first(sp.status)) ? first(sp.status) : "";
   const channel = first(sp.origem) in CHANNELS ? first(sp.origem) : "";
+  const source = first(sp.fonte) in SOURCE_LABELS ? first(sp.fonte) : "";
   const q = first(sp.q).trim().slice(0, 100);
 
   const { token } = await requireWorkspace(slug);
@@ -41,6 +43,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
       ...periodArgs(period),
       p_status: status || null,
       p_channel: channel || null,
+      p_source: source || null,
       p_search: q || null,
       p_limit: 500,
       p_offset: 0,
@@ -51,7 +54,14 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
     ? await call<Record<string, string[]>>("lh_lead_lp_events", { p_token: token, p_lead_ids: list.rows.map((l) => l.id) })
     : {};
 
-  const exportQuery = new URLSearchParams({ ...period.query, ...(status && { status }), ...(channel && { origem: channel }), ...(q && { q }) });
+  const exportQuery = new URLSearchParams({
+    ...period.query,
+    ...(status && { status }),
+    ...(channel && { origem: channel }),
+    ...(source && { fonte: source }),
+    ...(q && { q }),
+  });
+  const bySource = (stats.by_source ?? []).filter((s) => s.leads > 0);
   const compareText = period.previous ? formatRange(period.previous) : null;
   const trend = (pick: (s: Stats) => number) => (previous ? countTrend(pick(stats), pick(previous)) : null);
 
@@ -64,16 +74,22 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
         rangeText={period.key === "tudo" ? "Todo o histórico" : formatRange(period)}
         compareText={compareText}
       />
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-6">
         <Link
           href={`/w/${slug}/metricas?${new URLSearchParams(period.query)}`}
           className="col-span-2 rounded-lg border border-[#2a78d6]/30 bg-[#2a78d6]/5 px-3 py-2.5 hover:bg-[#2a78d6]/10 sm:px-4 sm:py-3 md:col-span-1"
         >
-          <div className="text-xs text-zinc-600">Taxa de conversão</div>
+          <div className="text-xs text-zinc-600">Conversão da LP</div>
           <div className="text-2xl font-semibold">{formatRate(rate(stats.clicks, stats.visitors))}</div>
           <TrendLine trend={previous ? rateTrend(rate(stats.clicks, stats.visitors), rate(previous.clicks, previous.visitors)) : null} />
           <div className="text-xs text-zinc-600">Ver métricas →</div>
         </Link>
+        <Tile
+          label="Leads (todas as fontes)"
+          value={stats.leads}
+          trend={trend((s) => s.leads)}
+          hint={bySource.length > 1 ? bySource.map((s) => `${s.leads} ${sourceLabel(s.source)}`).join(" · ") : bySource[0] && sourceLabel(bySource[0].source)}
+        />
         <Tile label="Visitantes na LP" value={stats.visitors} trend={trend((s) => s.visitors)} />
         <Tile label="Clicaram no WhatsApp" value={stats.clicks} trend={trend((s) => s.clicks)} />
         <Tile
@@ -93,6 +109,14 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
           <select name="status" defaultValue={status} className={`${controlClass} sm:w-40`} aria-label="Status">
             <option value="">Todos os status</option>
             {Object.entries(STATUSES).map(([k, label]) => (
+              <option key={k} value={k}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select name="fonte" defaultValue={source} className={`${controlClass} sm:w-44`} aria-label="Fonte">
+            <option value="">Todas as fontes</option>
+            {Object.entries(SOURCE_LABELS).map(([k, label]) => (
               <option key={k} value={k}>
                 {label}
               </option>
@@ -118,9 +142,9 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
       </div>
 
       {list.rows.length === 0 ? (
-        <EmptyState title={q || status || channel ? "Nenhum lead com esses filtros" : "Nenhum clique no WhatsApp ainda"}>
-          {!(q || status || channel) &&
-            "Assim que alguém clicar no WhatsApp da Landing Page, a linha aparece aqui em segundos."}
+        <EmptyState title={q || status || channel || source ? "Nenhum lead com esses filtros" : "Nenhum lead ainda"}>
+          {!(q || status || channel || source) &&
+            "Assim que um lead chegar (clique no WhatsApp da LP, formulário ou planilha), a linha aparece aqui."}
         </EmptyState>
       ) : (
         <>

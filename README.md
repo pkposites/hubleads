@@ -1,17 +1,42 @@
 # Lead Hub
 
-Planilha de leads da Landing Page: cada clique no botão de WhatsApp vira uma
-linha, com a origem completa do anúncio. O telefone fica para o atendente
-preencher, porque o visitante vai direto para o WhatsApp sem formulário.
+Central de leads de cada cliente: todas as **fontes de leads** caem na mesma
+planilha e na fila de atendimento, com a origem do anúncio, e o que vira
+agendamento ou venda volta para a Meta.
+
+Fontes:
+
+- **Landing Page**: cada clique no WhatsApp vira uma linha (tracker.js).
+- **Google Sheets**: um Apps Script na planilha (por exemplo, a que a
+  integração nativa dos formulários da Meta preenche) manda cada linha nova.
+- **Formulário da Meta, conexão direta** (avançado): o app busca os leads na
+  API da Meta a cada minuto.
+- **Manual**: o atendente adiciona.
 
 ## Como funciona
 
 ```
-Landing Page + tracker.js ──► /api/collect ──► lh_server_collect() ──► planilha
-  UTMs, gclid, fbclid,           (Next.js)      (Supabase)       atendente preenche
-  cookies do pixel da Meta,                                      telefone, status,
-  visitas e cliques no WhatsApp                                  valor e observações
+Landing Page + tracker.js ──► /api/collect ──────────► lh_server_collect() ──┐
+Google Sheets + Apps Script ─► /api/sources/sheets ──► lh_server_source_lead ─┼─► planilha / fila Atender
+Meta Lead Ads (API) ─────────► rotina de 1 minuto ───► lh_server_meta_form_lead┘   └─► Agendado/Venda voltam à Meta
 ```
+
+## Google Sheets (Apps Script)
+
+No painel mãe, cliente → **Fontes de leads → Google Sheets** → **Gerar
+script**. Cada planilha tem uma chave própria (mostrada uma vez, guardada só
+como hash; dá para pausar, trocar a chave ou remover). O script, colado em
+Extensões → Apps Script da planilha, roda a cada minuto e manda as linhas novas
+para `/api/sources/sheets` (até 100 por vez). `instalar` começa pelas linhas
+novas; `importarTudo` manda também as antigas. Linhas com o ID de lead da Meta
+(coluna `id`, com ou sem o prefixo `l:`) viram "Formulário Meta" e voltam para
+a Meta como eventos de CRM; as demais viram "Planilha". Cabeçalhos da Meta
+(`full_name`, `phone_number`, `email`, `campaign_name`...) e comuns em
+português (nome, telefone, WhatsApp, e-mail...) são reconhecidos; as outras
+colunas viram respostas. O mesmo lead nunca entra duas vezes.
+
+A planilha do atendente filtra por **fonte**, o quadrinho **Leads (todas as
+fontes)** mostra a divisão e as Métricas têm **Leads por fonte**.
 
 1. A LP recebe uma linha de código (em **Instalação na LP** no painel):
    ```html

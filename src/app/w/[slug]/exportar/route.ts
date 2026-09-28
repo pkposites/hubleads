@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { CHANNELS } from "@/lib/attribution";
 import { call } from "@/lib/db";
 import { isStatus, leadsToCsv, type Lead } from "@/lib/leads";
+import { SOURCE_LABELS } from "@/lib/source-labels";
 import { periodArgs, resolvePeriod } from "@/lib/period";
 import { currentSession } from "@/lib/session";
 
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
   const period = resolvePeriod({ periodo: sp.get("periodo") ?? "tudo", de: sp.get("de") ?? undefined, ate: sp.get("ate") ?? undefined });
   const status = sp.get("status");
   const channel = sp.get("origem");
+  const source = sp.get("fonte");
 
   const rows: Lead[] = [];
   for (let offset = 0; offset < 50_000; offset += 1000) {
@@ -25,6 +27,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
       ...periodArgs(period),
       p_status: isStatus(status) ? status : null,
       p_channel: channel && channel in CHANNELS ? channel : null,
+      p_source: source && source in SOURCE_LABELS ? source : null,
       p_search: sp.get("q") || null,
       p_limit: 1000,
       p_offset: offset,
@@ -37,7 +40,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
   await call("lh_log_export", {
     p_token: session.token,
     p_rows: rows.length,
-    p_filters: { ...period.query, status: status ?? null, origem: channel ?? null, busca: Boolean(sp.get("q")) },
+    p_filters: { ...period.query, status: status ?? null, origem: channel ?? null, fonte: source ?? null, busca: Boolean(sp.get("q")) },
   });
 
   const date = new Date().toISOString().slice(0, 10);

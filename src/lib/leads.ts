@@ -1,3 +1,4 @@
+import { sourceLabel } from "@/lib/source-labels";
 import { channelLabel } from "@/lib/attribution";
 
 export const STATUSES = {
@@ -16,7 +17,7 @@ export const isStatus = (value: unknown): value is Status =>
 export interface Lead {
   id: string;
   page_id: string | null;
-  source: "lp" | "manual";
+  source: "lp" | "manual" | "meta_form" | "sheets";
   code: string;
   name: string | null;
   phone: string | null;
@@ -121,6 +122,15 @@ export function formatMinutes(minutes: number | null | undefined) {
   return `${days} ${days === 1 ? "dia" : "dias"}`;
 }
 
+export interface SourceNumbers {
+  source: string;
+  leads: number;
+  with_phone: number;
+  scheduled: number;
+  sales: number;
+  revenue: number;
+}
+
 export interface Stats {
   visitors: number;
   clicks: number;
@@ -128,6 +138,8 @@ export interface Stats {
   with_phone: number;
   sales: number;
   revenue: number;
+  /** Leads of the period by where they came from (lp, meta_form, sheets, manual). */
+  by_source?: SourceNumbers[];
 }
 
 export interface LeadEvent {
@@ -188,7 +200,8 @@ export function adNames(l: Lead) {
 }
 
 const CSV_COLUMNS: [string, (l: Lead) => unknown][] = [
-  ["Data/hora do clique", (l) => l.created_at],
+  ["Data/hora de entrada", (l) => l.created_at],
+  ["Fonte", (l) => sourceLabel(l.source)],
   ["Código", (l) => l.code],
   ["Nome", (l) => l.name],
   ["Telefone", (l) => l.phone],
@@ -278,6 +291,7 @@ export interface Metrics {
   totals: Omit<MetricsRow, "key"> & { clicks: number; manual_leads: number };
   rows: MetricsRow[];
   daily: { day: string; visitors: number; clickers: number }[];
+  by_source?: SourceNumbers[];
 }
 
 /** Share as a whole percentage, or null when there is nothing to divide by. */

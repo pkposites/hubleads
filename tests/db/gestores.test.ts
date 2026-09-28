@@ -81,6 +81,7 @@ describe("separate panels for gestores", () => {
         if (type === "boolean") return true;
         if (type === "integer") return 10;
         if (type === "bigint") return Math.floor(Date.now() / 1000);
+        if (type === "uuid") return "00000000-0000-4000-8000-000000000000";
         if (type === "text[]") return [];
         return "x";
       });

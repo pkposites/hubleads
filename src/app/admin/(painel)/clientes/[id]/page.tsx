@@ -13,6 +13,7 @@ import { AddPageForm, DeleteClient, OwnerForm, PageSettings, ResetPassword } fro
 import { MetaSettings, type MetaSettingsData } from "./meta-settings";
 import { PrivacySettings } from "./privacy-settings";
 import { LeadForms, type LeadFormsData } from "./lead-forms";
+import { SheetSources, type SheetSource } from "./sheet-sources";
 import type { PrivacySettings as PrivacyData } from "@/lib/privacy";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -41,12 +42,13 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
     if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) notFound();
     throw error;
   }
-  const [events, meta, pixels, privacy, leadForms] = await Promise.all([
+  const [events, meta, pixels, privacy, leadForms, sources] = await Promise.all([
     call<LeadEvent[]>("lh_admin_list_events", { p_token: token, p_workspace_id: id, p_limit: 50 }),
     call<MetaSettingsData>("lh_admin_get_meta", { p_token: token, p_workspace_id: id }),
     call<{ pixel_id: string; last_seen: string }[]>("lh_admin_lp_pixels", { p_token: token, p_workspace_id: id }),
     call<PrivacyData>("lh_admin_get_privacy", { p_token: token, p_workspace_id: id }),
     call<LeadFormsData>("lh_admin_get_lead_forms", { p_token: token, p_workspace_id: id }),
+    call<SheetSource[]>("lh_admin_list_sources", { p_token: token, p_workspace_id: id }),
   ]);
   const origin = await appOrigin();
   const gestores =
@@ -86,6 +88,15 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
         </div>
       </Card>
 
+      <div className="mt-2">
+        <h2 className="text-base font-semibold">Fontes de leads</h2>
+        <p className="text-sm text-zinc-600">De onde os leads deste cliente chegam. Todos caem na mesma planilha e na fila Atender, com a fonte marcada.</p>
+      </div>
+
+      <Card title="Google Sheets (formulários da Meta e outras planilhas)">
+        <SheetSources workspaceId={client.id} sources={sources} />
+      </Card>
+
       {client.pages.map((page) => (
         <Card key={page.id} title={`Landing Page: ${page.name}`}>
           <div className="flex flex-col gap-4">
@@ -110,20 +121,25 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
         </Card>
       ))}
 
-      <Card title="Privacidade (LGPD)">
-        <PrivacySettings workspaceId={client.id} data={privacy} policyUrl={`${origin}/privacidade/${client.slug}`} />
+      <Card title="Adicionar outra Landing Page">
+        <AddPageForm workspaceId={client.id} />
       </Card>
 
-      <Card title="Formulários nativos da Meta (Lead Ads)">
+      <Card title="Formulários da Meta: conexão direta pela API (avançado)">
         <LeadForms workspaceId={client.id} data={leadForms} serverReady={Boolean(serverSecret()) && Boolean(encryptionKey())} />
       </Card>
+
+      <div className="mt-2">
+        <h2 className="text-base font-semibold">Retorno para a Meta e configurações</h2>
+        <p className="text-sm text-zinc-600">Agendado e Venda voltam para a Meta; privacidade e eventos das LPs.</p>
+      </div>
 
       <Card title="Conversões para a Meta (API de Conversões)">
         <MetaSettings workspaceId={client.id} data={meta} pixels={pixels.map((p) => p.pixel_id)} serverReady={{ secret: Boolean(serverSecret()), key: Boolean(encryptionKey()) }} />
       </Card>
 
-      <Card title="Adicionar outra Landing Page">
-        <AddPageForm workspaceId={client.id} />
+      <Card title="Privacidade (LGPD)">
+        <PrivacySettings workspaceId={client.id} data={privacy} policyUrl={`${origin}/privacidade/${client.slug}`} />
       </Card>
 
       <Card title="Eventos recentes das LPs">

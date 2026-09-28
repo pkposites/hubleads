@@ -93,7 +93,11 @@ describe("panel access and editing", () => {
     await collect(pool, a.key, { type: "page_view", visitor_id: "a-2" });
     await collect(pool, a.key, { type: "page_view", visitor_id: "a-2" });
     const stats = await anon(pool, "select lh_stats($1) as r", [a.token]);
-    expect(stats).toEqual({ visitors: 2, clicks: 1, leads: 2, with_phone: 2, sales: 1, revenue: 18000 });
+    expect(stats).toMatchObject({ visitors: 2, clicks: 1, leads: 2, with_phone: 2, sales: 1, revenue: 18000 });
+    expect((stats as { by_source: { source: string; leads: number }[] }).by_source.map((s) => [s.source, s.leads]).sort()).toEqual([
+      ["lp", 1],
+      ["manual", 1],
+    ]);
   });
 
   it("never lets API roles read the tables directly", async () => {
