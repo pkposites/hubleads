@@ -1,10 +1,7 @@
+import { DismissibleAlert, type AlertMode } from "@/components/dismissible-alert";
 import { formatMb, type InfraStatus, type InfraNumbers } from "@/lib/infra";
 
-const STYLE = {
-  ok: "border-zinc-200 bg-white",
-  atencao: "border-amber-300 bg-amber-50",
-  trocar: "border-red-300 bg-red-50",
-} as const;
+const TONE = { ok: "neutral", atencao: "amber", trocar: "red" } as const;
 
 const TITLE = {
   ok: "Banco de dados: tudo certo por enquanto",
@@ -13,11 +10,20 @@ const TITLE = {
 } as const;
 
 /** Tells the admin when to move Lead Hub out of the shared Supabase project. */
-export function InfraAlert({ status, numbers }: { status: InfraStatus; numbers: InfraNumbers }) {
+export function InfraAlert({
+  status,
+  numbers,
+  mode,
+}: {
+  status: InfraStatus;
+  numbers: InfraNumbers;
+  /** Minimised or hidden by the admin (until the level changes). */
+  mode: (signature: string) => AlertMode;
+}) {
   if (status.level === "ok" && !status.shared) return null;
+  const signature = `${status.level}-${status.shared ? "s" : "p"}`;
   return (
-    <section className={`rounded-lg border p-4 text-sm ${STYLE[status.level]}`} role={status.level === "ok" ? undefined : "alert"}>
-      <h2 className="font-semibold">{TITLE[status.level]}</h2>
+    <DismissibleAlert id="banco" signature={signature} initialMode={mode(signature)} tone={TONE[status.level]} title={TITLE[status.level]}>
       {status.reasons.length > 0 && (
         <ul className="mt-2 list-disc space-y-0.5 pl-5">
           {status.reasons.map((r) => (
@@ -41,6 +47,6 @@ export function InfraAlert({ status, numbers }: { status: InfraStatus; numbers: 
           ? ` · ${numbers.other_tables} ${numbers.other_tables === 1 ? "tabela" : "tabelas"} de outro sistema no mesmo banco`
           : ""}
       </p>
-    </section>
+    </DismissibleAlert>
   );
 }
