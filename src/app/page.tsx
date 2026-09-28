@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
+import { currentAdmin } from "@/lib/admin";
 import { currentSession } from "@/lib/session";
 import { LoginForm } from "./login-form";
 
 export default async function Home() {
   const session = await currentSession();
   if (session) redirect(`/w/${session.workspace.slug}/atender`);
+  // The app on the home screen opens here; an admin goes to the painel mãe.
+  if (await currentAdmin()) redirect("/admin");
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">

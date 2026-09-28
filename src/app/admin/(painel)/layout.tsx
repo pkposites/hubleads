@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin";
+import { vapidPublicKey } from "@/lib/push";
 import { adminLogout } from "../actions";
+import { AdminPush } from "./admin-push";
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const { login, role } = await requireAdmin();
@@ -25,6 +27,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
             )}
           </nav>
           <div className="ml-auto flex items-center gap-3 text-sm text-zinc-300">
+            <AdminPush vapidKey={vapidPublicKey()} master={role === "master"} />
             <Link href="/admin/conta" className="hover:text-white" title="Minha conta">
               {login}
               <span className="ml-1.5 rounded bg-zinc-700 px-1.5 py-0.5 text-xs">{role === "master" ? "master" : "gestor"}</span>

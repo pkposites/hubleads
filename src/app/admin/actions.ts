@@ -51,6 +51,30 @@ export async function adminLogin(_prev: AdminFormState, formData: FormData): Pro
   redirect("/admin");
 }
 
+/** New-lead notifications of all the admin's clients on this device. */
+export async function adminPushSubscribe(subscription: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }): Promise<{ error?: string }> {
+  const { token } = await requireAdmin();
+  if (!subscription.endpoint || !/^https:\/\//.test(subscription.endpoint) || !subscription.keys?.p256dh || !subscription.keys.auth) {
+    return { error: "Assinatura inválida." };
+  }
+  try {
+    await call("lh_admin_push_subscribe", {
+      p_token: token,
+      p_endpoint: subscription.endpoint,
+      p_p256dh: subscription.keys.p256dh,
+      p_auth: subscription.keys.auth,
+    });
+    return {};
+  } catch {
+    return { error: "Não foi possível ativar os avisos." };
+  }
+}
+
+export async function adminPushUnsubscribe(endpoint: string) {
+  const { token } = await requireAdmin();
+  await call("lh_admin_push_unsubscribe", { p_token: token, p_endpoint: endpoint }).catch(() => undefined);
+}
+
 export async function adminLogout() {
   const store = await cookies();
   const token = store.get(ADMIN_COOKIE)?.value;

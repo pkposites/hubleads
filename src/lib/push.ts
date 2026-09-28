@@ -1,8 +1,8 @@
 import "server-only";
 import webpush from "web-push";
-import { channelLabel } from "@/lib/attribution";
 import { call } from "@/lib/db";
 import { serverSecret } from "@/lib/server";
+import { newLeadMessages, type NewLeadInfo } from "@/lib/push-messages";
 
 // Read at request time (a literal process.env.NEXT_PUBLIC_* would be fixed at build time).
 const PUBLIC_KEY_VAR = "NEXT_PUBLIC_VAPID_PUBLIC_KEY";
@@ -17,13 +17,12 @@ function configured() {
   return { secret, vapid: { subject, publicKey, privateKey } };
 }
 
-interface NewLeadPush {
-  slug: string;
-  lead: { code: string; name: string | null; channel: string | null; ad: string | null; campaign: string | null };
-  targets: { endpoint: string; p256dh: string; auth: string }[];
+interface NewLeadPush extends NewLeadInfo {
+  /** "client": the client's devices; "admin": masters and the gestor who owns the client. */
+  targets: { kind: "client" | "admin"; endpoint: string; p256dh: string; auth: string }[];
 }
 
-/** Notifies every device subscribed to the lead's client. Never throws. */
+/** Notifies the client's devices and the admins' devices. Never throws. */
 export async function notifyNewLead(leadId: string) {
   const config = configured();
   if (!config) return;
@@ -31,21 +30,16 @@ export async function notifyNewLead(leadId: string) {
     const push = await call<NewLeadPush | null>("lh_server_new_lead_push", { p_secret: config.secret, p_lead_id: leadId });
     if (!push || push.targets.length === 0) return;
 
-    const origin = [channelLabel(push.lead.channel), push.lead.ad ?? push.lead.campaign].filter(Boolean).join(" · ");
     // The payload is encrypted for each device; nothing here is logged.
-    const payload = JSON.stringify({
-      title: `Novo lead · ${push.lead.code}`,
-      body: `${push.lead.name ?? "Sem nome"}${origin ? ` — ${origin}` : ""}`,
-      url: `/w/${push.slug}/atender`,
-      tag: `lead-${push.lead.code}`,
-    });
+    const messages = newLeadMessages(push);
+    const payloads = { client: JSON.stringify(messages.client), admin: JSON.stringify(messages.admin) };
 
     let sent = 0;
     let gone = 0;
     await Promise.all(
       push.targets.map(async (t) => {
         try {
-          await webpush.sendNotification({ endpoint: t.endpoint, keys: { p256dh: t.p256dh, auth: t.auth } }, payload, {
+          await webpush.sendNotification({ endpoint: t.endpoint, keys: { p256dh: t.p256dh, auth: t.auth } }, payloads[t.kind] ?? payloads.client, {
             vapidDetails: config.vapid,
             TTL: 60 * 60,
             urgency: "high",
