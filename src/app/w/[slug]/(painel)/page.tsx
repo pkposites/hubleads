@@ -11,6 +11,7 @@ import { requireWorkspace } from "@/lib/session";
 import { LeadSheet } from "./lead-sheet";
 import { NewLeadForm } from "./new-lead-form";
 import { PeriodPicker } from "./period-picker";
+import { SheetColumnsButton } from "./sheet-columns-button";
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
@@ -135,6 +136,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
         </form>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <NewLeadForm slug={slug} />
+          <SheetColumnsButton />
           <a href={`/w/${slug}/exportar?${exportQuery}`} className={buttonClass("secondary")}>
             Exportar CSV
           </a>

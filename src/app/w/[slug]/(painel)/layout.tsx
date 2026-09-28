@@ -3,6 +3,7 @@ import { call } from "@/lib/db";
 import type { Template } from "@/lib/leads";
 import { vapidPublicKey } from "@/lib/push";
 import { requireWorkspace } from "@/lib/session";
+import { resolveColumns, type SheetConfig } from "@/lib/sheet-columns";
 import { logout } from "../actions";
 import { AutoRefresh } from "./auto-refresh";
 import { NewLeadAlert } from "./new-lead-alert";
@@ -15,13 +16,15 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
   const { slug } = await params;
   const { token, workspace } = await requireWorkspace(slug);
   const asAdmin = workspace.role === "admin";
-  const [templates, counts] = await Promise.all([
+  const [templates, counts, sheet] = await Promise.all([
     call<Template[]>("lh_list_templates", { p_token: token }),
     call<{ waiting: number; due: number; latest: string | null }>("lh_queue_count", { p_token: token }),
+    call<SheetConfig>("lh_sheet_config", { p_token: token }),
   ]);
+  const columns = resolveColumns(sheet.columns, sheet.answers);
 
   return (
-    <PanelProvider value={{ slug, company: workspace.name, templates, isAdmin: asAdmin }}>
+    <PanelProvider value={{ slug, company: workspace.name, templates, isAdmin: asAdmin, columns, answers: sheet.answers }}>
       <div className="flex flex-1 flex-col">
         <AutoRefresh />
         <NewLeadAlert latest={counts.latest} waiting={counts.waiting} />

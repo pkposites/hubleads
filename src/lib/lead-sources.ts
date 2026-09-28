@@ -119,7 +119,7 @@ export function mapSheetRow(row: Record<string, unknown>, sourceId: string): Sou
   let count = 0;
   for (const [key, { header, value }] of fields) {
     if (IGNORED.has(key) || count >= 30) continue;
-    answers[/[A-Z ]/.test(header) ? header.slice(0, 60) : questionLabel(header)] = value;
+    answers[/[A-Z ]/.test(header) ? header.slice(0, 120) : questionLabel(header)] = value;
     count++;
   }
   if (email) answers["E-mail"] = email;

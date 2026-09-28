@@ -184,11 +184,9 @@ export function answerEntries(extra: Record<string, unknown> | null | undefined)
     .map(([key, value]) => [key, typeof value === "boolean" ? (value ? "Sim" : "Não") : String(value)]);
 }
 
-/** "tempo_de_queda" -> "Tempo de queda". */
-export function answerLabel(key: string): string {
-  const text = key.replace(/[_-]+/g, " ").trim();
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
+import { answerLabel, answerValue, type SheetColumn } from "@/lib/sheet-columns";
+
+export { answerLabel };
 
 /** Meta ads usually send names in utm_* (campaign / term = ad set / content = ad). */
 export function adNames(l: Lead) {
@@ -238,7 +236,7 @@ const CSV_COLUMNS: [string, (l: Lead) => unknown][] = [
   ["Cliques", (l) => l.clicks],
   ["Último clique", (l) => l.last_click_at],
   ["Primeira visita", (l) => l.first_seen_at],
-  ["Entrada", (l) => (l.source === "manual" ? "Manual" : "Landing Page")],
+  ["Entrada", (l) => sourceLabel(l.source)],
   ["Parâmetros da URL", (l) => (l.url_params && Object.keys(l.url_params).length ? JSON.stringify(l.url_params) : "")],
 ];
 
@@ -251,14 +249,18 @@ function csvCell(value: unknown): string {
 }
 
 /** Semicolon-separated with a BOM, which Excel in pt-BR opens correctly. */
-export function leadsToCsv(leads: readonly Lead[]): string {
-  // One extra column per answer key found in the exported rows.
-  const answerKeys = [...new Set(leads.flatMap((l) => answerEntries(l.extra).map(([k]) => k)))];
+export function leadsToCsv(leads: readonly Lead[], sheetColumns: readonly SheetColumn[] = []): string {
+  // One column per answer / added column: in the client's order and names,
+  // then any other answer found in the exported rows. Hidden ones are kept
+  // (the export is the complete record).
+  const found = new Set(leads.flatMap((l) => answerEntries(l.extra).map(([k]) => k)));
+  const named = sheetColumns.filter((c) => c.kind !== "fixed");
+  const keys = [...named.map((c) => c.key), ...[...found].filter((k) => !named.some((c) => c.key === k))];
   const columns: [string, (l: Lead) => unknown][] = [
     ...CSV_COLUMNS,
-    ...answerKeys.map((key): [string, (l: Lead) => unknown] => [
-      answerLabel(key),
-      (l) => answerEntries(l.extra).find(([k]) => k === key)?.[1],
+    ...keys.map((key): [string, (l: Lead) => unknown] => [
+      named.find((c) => c.key === key)?.label || answerLabel(key),
+      (l) => answerValue(answerEntries(l.extra).find(([k]) => k === key)?.[1]),
     ]),
   ];
   const lines = [columns.map(([h]) => csvCell(h)).join(";")];

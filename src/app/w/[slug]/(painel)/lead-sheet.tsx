@@ -5,9 +5,10 @@ import { Button } from "@/components/ui";
 import { channelLabel } from "@/lib/attribution";
 import { sourceLabel } from "@/lib/source-labels";
 import { formatDateTime, timeSince } from "@/lib/format";
-import { adNames, answerEntries, answerLabel, type Lead } from "@/lib/leads";
+import { adNames, type Lead } from "@/lib/leads";
+import { answerValue, dataColumns, showsFixed, type SheetColumn } from "@/lib/sheet-columns";
 import { deleteLeads } from "../actions";
-import { EventChips, HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StatusCell, TextCell, WaitTimer, WhatsAppButton } from "./lead-fields";
+import { EventChips, FieldCell, HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StatusCell, TextCell, WaitTimer, WhatsAppButton } from "./lead-fields";
 import { usePanel } from "./panel-context";
 
 const path = (url: string | null) => {
@@ -31,6 +32,19 @@ function AdCell({ name, id }: { name: string | null; id: string | null }) {
   );
 }
 
+/** One answer (read as sent) or added column (filled in by the attendant). */
+function DataCell({ lead, column }: { lead: Lead; column: SheetColumn }) {
+  if (column.kind === "custom") {
+    return (
+      <td className="px-1 py-0.5">
+        <FieldCell lead={lead} field={column.key} label={column.label} className="w-44" />
+      </td>
+    );
+  }
+  const value = answerValue(lead.extra?.[column.key]);
+  return <td className="min-w-32 max-w-60 break-words px-2 py-1.5 text-xs">{muted(value)}</td>;
+}
+
 /** One card per lead: the phone layout of the sheet, and the queue on every screen. */
 export function LeadCard({
   lead,
@@ -50,7 +64,10 @@ export function LeadCard({
   lpEvents?: string[];
 }) {
   const names = adNames(lead);
-  const answers = answerEntries(lead.extra);
+  const { columns } = usePanel();
+  const fields = dataColumns(columns);
+  const custom = fields.filter((c) => c.kind === "custom");
+  const answers = fields.filter((c) => c.kind === "answer").map((c) => [c.label, answerValue(lead.extra?.[c.key])]);
   return (
     <li className={`rounded-lg border bg-white p-3 ${selected ? "border-red-300 bg-red-50/50" : "border-zinc-200"}`}>
       <div className="flex items-start justify-between gap-2">
@@ -94,6 +111,14 @@ export function LeadCard({
         </div>
         <NextContactCell lead={lead} />
         <TextCell lead={lead} field="notes" placeholder="Anotar observação" className="w-full" />
+        {custom.map((c) => (
+          <label key={c.key} className="flex items-center gap-2 text-xs text-zinc-500">
+            <span className="w-28 shrink-0 truncate">{c.label}</span>
+            <div className="flex-1">
+              <FieldCell lead={lead} field={c.key} label={c.label} className="w-full" />
+            </div>
+          </label>
+        ))}
       </div>
       <div className="mt-2 flex items-center justify-between gap-2">
         <details className="min-w-0 flex-1 text-sm">
@@ -107,7 +132,7 @@ export function LeadCard({
               ["Página", lead.landing_url],
               ["Dispositivo", lead.device],
               ["Cliques", String(lead.clicks)],
-              ...answers.map(([k, v]) => [answerLabel(k), v]),
+              ...answers,
             ]
               .filter(([, v]) => v)
               .map(([k, v]) => (
@@ -172,7 +197,10 @@ function DeleteDialog({
 }
 
 export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: Record<string, string[]> }) {
-  const { slug, isAdmin: canDelete } = usePanel();
+  const { slug, isAdmin: canDelete, columns } = usePanel();
+  const fields = dataColumns(columns);
+  const show = (key: Parameters<typeof showsFixed>[1]) => showsFixed(columns, key);
+  const label = (key: string) => columns.find((c) => c.key === key && c.kind === "fixed")?.label ?? key;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [deleting, startDelete] = useTransition();
@@ -238,7 +266,7 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
         ))}
       </ul>
     <div className="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-white md:block">
-      <table className="w-full min-w-[2400px] border-collapse text-left text-sm">
+      <table className="w-max min-w-full border-collapse text-left text-sm">
         <thead className="sticky top-0 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
           <tr className="border-b border-zinc-200">
             {canDelete && (
@@ -252,26 +280,21 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
               </th>
             )}
             {[
-              "Entrada",
-              "Cód.",
-              "Nome",
-              "Telefone",
-              "Status",
-              "Retorno",
-              "Valor",
-              "Eventos na LP",
-              "Respostas",
-              "Origem",
-              "Campanha",
-              "Conjunto",
-              "Anúncio",
-              "Página",
-              "Dispositivo",
-              "Cliques",
-              "Observações",
-              "",
-            ].map((h) => (
-              <th key={h} className="whitespace-nowrap px-2 py-2 font-medium">
+              ["entrada", "Entrada"],
+              ["cod", "Cód."],
+              ["nome", "Nome"],
+              ["telefone", "Telefone"],
+              ["status", "Status"],
+              ["retorno", "Retorno"],
+              ["valor", "Valor"],
+              ...(show("lp_events") ? [["lp_events", label("lp_events")]] : []),
+              ...fields.map((c) => [`f:${c.key}`, c.label]),
+              ...(["origin", "campaign", "adset", "ad", "page", "device", "clicks", "notes"] as const)
+                .filter((k) => show(k))
+                .map((k) => [k, label(k)]),
+              ["historico", ""],
+            ].map(([key, h]) => (
+              <th key={key} className={`px-2 py-2 font-medium ${key.startsWith("f:") ? "min-w-32 max-w-60 align-bottom normal-case tracking-normal" : "whitespace-nowrap"}`}>
                 {h}
               </th>
             ))}
@@ -317,45 +340,44 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
               <td className="px-1 py-0.5">
                 <TextCell lead={lead} field="sale_value" placeholder="R$" display={moneyDisplay} className="w-28" />
               </td>
-              <td className="min-w-40 max-w-56 px-2 py-1.5">
-                {lpEvents[lead.id]?.length ? <EventChips events={lpEvents[lead.id]} max={6} /> : <span className="text-xs text-zinc-300">—</span>}
-              </td>
-              <td className="min-w-48 max-w-72 px-2 py-1.5 text-xs">
-                {answerEntries(lead.extra).length === 0 ? (
-                  <span className="text-zinc-300">—</span>
-                ) : (
-                  <dl className="space-y-0.5">
-                    {answerEntries(lead.extra).map(([key, value]) => (
-                      <div key={key}>
-                        <dt className="inline text-zinc-500">{answerLabel(key)}: </dt>
-                        <dd className="inline">{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-              </td>
-              <td className="whitespace-nowrap px-2 py-1.5">
-                {channelLabel(lead.channel)}
-                <div className="text-xs text-zinc-500">{sourceLabel(lead.source)}</div>
-              </td>
-              <td className="max-w-48 px-2 py-1.5 text-xs">
-                <div className="break-words">{muted(adNames(lead).campaign)}</div>
-                {lead.campaign_id && <div className="font-mono text-zinc-500">#{lead.campaign_id}</div>}
-                <div className="text-zinc-500">
-                  {lead.utm_source}
-                  {lead.utm_medium && ` / ${lead.utm_medium}`}
-                </div>
-              </td>
-              <AdCell name={adNames(lead).adset} id={lead.adset_id} />
-              <AdCell name={adNames(lead).ad} id={lead.ad_id} />
-              <td className="max-w-40 truncate px-2 py-1.5 text-xs" title={lead.landing_url ?? undefined}>
-                {path(lead.landing_url)}
-              </td>
-              <td className="px-2 py-1.5 text-xs">{muted(lead.device)}</td>
-              <td className="px-2 py-1.5 text-center">{lead.clicks}</td>
-              <td className="px-1 py-0.5">
-                <TextCell lead={lead} field="notes" placeholder="Anotar" className="w-56" />
-              </td>
+              {show("lp_events") && (
+                <td className="min-w-40 max-w-56 px-2 py-1.5">
+                  {lpEvents[lead.id]?.length ? <EventChips events={lpEvents[lead.id]} max={6} /> : <span className="text-xs text-zinc-300">—</span>}
+                </td>
+              )}
+              {fields.map((c) => (
+                <DataCell key={c.key} lead={lead} column={c} />
+              ))}
+              {show("origin") && (
+                <td className="whitespace-nowrap px-2 py-1.5">
+                  {channelLabel(lead.channel)}
+                  <div className="text-xs text-zinc-500">{sourceLabel(lead.source)}</div>
+                </td>
+              )}
+              {show("campaign") && (
+                <td className="max-w-48 px-2 py-1.5 text-xs">
+                  <div className="break-words">{muted(adNames(lead).campaign)}</div>
+                  {lead.campaign_id && <div className="font-mono text-zinc-500">#{lead.campaign_id}</div>}
+                  <div className="text-zinc-500">
+                    {lead.utm_source}
+                    {lead.utm_medium && ` / ${lead.utm_medium}`}
+                  </div>
+                </td>
+              )}
+              {show("adset") && <AdCell name={adNames(lead).adset} id={lead.adset_id} />}
+              {show("ad") && <AdCell name={adNames(lead).ad} id={lead.ad_id} />}
+              {show("page") && (
+                <td className="max-w-40 truncate px-2 py-1.5 text-xs" title={lead.landing_url ?? undefined}>
+                  {path(lead.landing_url)}
+                </td>
+              )}
+              {show("device") && <td className="px-2 py-1.5 text-xs">{muted(lead.device)}</td>}
+              {show("clicks") && <td className="px-2 py-1.5 text-center">{lead.clicks}</td>}
+              {show("notes") && (
+                <td className="px-1 py-0.5">
+                  <TextCell lead={lead} field="notes" placeholder="Anotar" className="w-56" />
+                </td>
+              )}
               <td className="px-2 py-1.5">
                 <HistoryButton lead={lead} />
               </td>

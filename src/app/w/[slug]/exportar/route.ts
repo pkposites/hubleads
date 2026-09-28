@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { CHANNELS } from "@/lib/attribution";
 import { call } from "@/lib/db";
 import { isStatus, leadsToCsv, type Lead } from "@/lib/leads";
+import { resolveColumns, type SheetConfig } from "@/lib/sheet-columns";
 import { SOURCE_LABELS } from "@/lib/source-labels";
 import { periodArgs, resolvePeriod } from "@/lib/period";
 import { currentSession } from "@/lib/session";
@@ -43,8 +44,9 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
     p_filters: { ...period.query, status: status ?? null, origem: channel ?? null, fonte: source ?? null, busca: Boolean(sp.get("q")) },
   });
 
+  const config = await call<SheetConfig>("lh_sheet_config", { p_token: session.token });
   const date = new Date().toISOString().slice(0, 10);
-  return new Response(leadsToCsv(rows), {
+  return new Response(leadsToCsv(rows, resolveColumns(config.columns)), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="leads-${slug}-${date}.csv"`,

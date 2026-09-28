@@ -19,7 +19,18 @@ import { TrendLine } from "@/components/trend";
 import { countTrend, formatRange, periodArgs, rateTrend, resolvePeriod, type Trend } from "@/lib/period";
 import type { Stats } from "@/lib/leads";
 import { sourceLabel } from "@/lib/source-labels";
+import { answerValue, dataColumns, resolveColumns, type SheetConfig } from "@/lib/sheet-columns";
+import { buttonClass, controlClass } from "@/components/ui";
 import { DailyCharts } from "./daily-charts";
+
+interface AnswerRow {
+  value: string;
+  leads: number;
+  with_phone: number;
+  scheduled: number;
+  sales: number;
+  revenue: number;
+}
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
@@ -58,18 +69,22 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
   const { token } = await requireWorkspace(slug);
 
   const args = periodArgs(period);
-  const [metrics, attendance, lpEvents, previous] = await Promise.all([
+  const sheet = await call<SheetConfig>("lh_sheet_config", { p_token: token });
+  const questions = dataColumns(resolveColumns(sheet.columns, sheet.answers));
+  const question = questions.find((c) => c.key === first(sp.resposta)) ?? questions[0];
+  const [metrics, attendance, lpEvents, previous, byAnswer] = await Promise.all([
     call<Metrics>("lh_metrics", { p_token: token, ...args, p_dimension: dimension }),
     call<AttendanceMetrics>("lh_attendance_metrics", { p_token: token, ...args }),
     call<LpEventMetric[]>("lh_lp_event_metrics", { p_token: token, ...args }),
     period.previous ? call<Stats>("lh_stats", { p_token: token, ...periodArgs(period.previous) }) : null,
+    question ? call<AnswerRow[]>("lh_answer_metrics", { p_token: token, p_key: question.key, ...args }) : [],
   ]);
   const within5 = rate(attendance.within_5_min, attendance.contacted);
   const lostTotal = attendance.lost_reasons.reduce((sum, r) => sum + r.count, 0);
   const t = metrics.totals;
   const conversion = rate(t.clickers, t.visitors);
   const href = (changes: Record<string, string>) =>
-    `/w/${slug}/metricas?${new URLSearchParams({ ...period.query, por: dimension, ...changes })}`;
+    `/w/${slug}/metricas?${new URLSearchParams({ ...period.query, por: dimension, ...(question && { resposta: question.key }), ...changes })}`;
   const compareText = period.previous ? formatRange(period.previous) : null;
 
   const funnel: { label: string; value: number; hint?: string }[] = [
@@ -195,6 +210,57 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
                 ))}
               </tbody>
             </table>
+          </div>
+        </section>
+      )}
+
+      {question && (
+        <section className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold">Leads por resposta</h2>
+              <p className="text-xs text-zinc-500">Quantos leads escolheram cada resposta e quantos agendaram ou compraram.</p>
+            </div>
+            <form method="get" className="flex w-full gap-2 sm:w-auto">
+              {Object.entries({ ...period.query, por: dimension }).map(([k, v]) => (
+                <input key={k} type="hidden" name={k} value={v} />
+              ))}
+              <select name="resposta" defaultValue={question.key} className={`${controlClass} min-w-0 flex-1 sm:w-80`} aria-label="Pergunta">
+                {questions.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+              <button className={buttonClass("secondary")}>Ver</button>
+            </form>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wide text-zinc-500">
+                <tr>
+                  {[question.label, "Leads", "Com telefone", "Agendaram", "Compraram", "Faturamento", "Agendamento"].map((h, i) => (
+                    <th key={i} className={`py-1.5 pr-4 font-medium ${i > 0 ? "text-right" : "normal-case tracking-normal"}`}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {byAnswer.map((row) => (
+                  <tr key={row.value}>
+                    <td className="py-2 pr-4">{row.value ? answerValue(row.value) : <span className="text-zinc-500">Sem resposta</span>}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{row.leads}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{row.with_phone}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{row.scheduled}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{row.sales}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{formatMoney(row.revenue)}</td>
+                    <td className="py-2 text-right tabular-nums">{formatRate(rate(row.scheduled, row.leads))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {byAnswer.length === 0 && <p className="py-2 text-sm text-zinc-500">Nenhum lead neste período.</p>}
           </div>
         </section>
       )}

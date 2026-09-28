@@ -2,12 +2,17 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import type { Template } from "@/lib/leads";
+import type { SheetColumn } from "@/lib/sheet-columns";
 
 interface Panel {
   slug: string;
   company: string;
   templates: Template[];
   isAdmin: boolean;
+  /** Sheet columns in display order (answers, added columns, standard ones). */
+  columns: SheetColumn[];
+  /** Answers found in recent leads, for the column settings. */
+  answers: { key: string; leads: number }[];
 }
 
 const PanelContext = createContext<Panel | null>(null);

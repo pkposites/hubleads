@@ -7,7 +7,8 @@ import { formatDateTime, formatMoney, formatPhone, formatWhen, localAt, toLocalI
 import { fillTemplate, formatMinutes, LOST_REASONS, STATUSES, type HistoryEntry, type Lead, type Status } from "@/lib/leads";
 import { eventLabel, type LpEvent } from "@/lib/lp-events";
 import { whatsappDigits } from "@/lib/normalize";
-import { leadHistory, logContact, setLeadStatus, updateLeadField, type EditableField } from "../actions";
+import { answerLabel } from "@/lib/sheet-columns";
+import { leadHistory, logContact, setLeadStatus, updateLeadCustomField, updateLeadField, type EditableField } from "../actions";
 import { BottomSheet } from "./bottom-sheet";
 import { usePanel } from "./panel-context";
 
@@ -106,6 +107,53 @@ export function TextCell({
         className={`${className} rounded border border-transparent bg-transparent px-1.5 py-1 text-base hover:border-zinc-300 md:text-sm focus:border-zinc-900 focus:bg-white focus:outline-none ${
           pending ? "opacity-60" : ""
         } ${field === "phone" && !value ? "border-dashed border-amber-300 bg-amber-50/60" : ""}`}
+      />
+      {error && <span className="px-1.5 text-xs text-red-700">{error}</span>}
+    </div>
+  );
+}
+
+/** A column the admin added: free text the attendant fills in. */
+export function FieldCell({ lead, field, label, className = "w-40" }: { lead: Lead; field: string; label: string; className?: string }) {
+  const { slug } = usePanel();
+  const refresh = useBackgroundRefresh();
+  const current = lead.extra?.[field];
+  const [saved, setSaved] = useSynced(current === null || current === undefined ? "" : String(current));
+  const [value, setValue] = useSynced(saved);
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const commit = () => {
+    if (value.trim() === saved.trim()) return;
+    start(async () => {
+      const result = await updateLeadCustomField(slug, lead.id, field, value);
+      if (result.error) {
+        setError(result.error);
+        setValue(saved);
+      } else {
+        setError(null);
+        setSaved(result.value ?? "");
+        setValue(result.value ?? "");
+        refresh();
+      }
+    });
+  };
+
+  return (
+    <div className="flex flex-col">
+      <input
+        value={value}
+        placeholder="Preencher"
+        aria-label={label}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") setValue(saved);
+        }}
+        className={`${className} rounded border border-transparent bg-transparent px-1.5 py-1 text-base hover:border-zinc-300 md:text-sm focus:border-zinc-900 focus:bg-white focus:outline-none ${
+          pending ? "opacity-60" : ""
+        }`}
       />
       {error && <span className="px-1.5 text-xs text-red-700">{error}</span>}
     </div>
@@ -404,6 +452,8 @@ export function describeHistory(h: HistoryEntry): string {
       return `WhatsApp aberto: ${h.to}`;
     case "meta":
       return `Meta: ${h.to}`;
+    case "field":
+      return h.to ? `${answerLabel(h.from ?? "")}: ${h.to}` : `${answerLabel(h.from ?? "")} apagado`;
     default:
       return h.type;
   }

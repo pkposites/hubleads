@@ -59,7 +59,7 @@ const STANDARD_LABELS: Record<string, string> = {
 export function questionLabel(key: string): string {
   if (STANDARD_LABELS[key]) return STANDARD_LABELS[key];
   const text = key.replace(/_/g, " ").replace(/\s+/g, " ").trim();
-  return (text.charAt(0).toUpperCase() + text.slice(1)).slice(0, 60);
+  return (text.charAt(0).toUpperCase() + text.slice(1)).slice(0, 120);
 }
 
 /** One Graph API lead -> the row the sheet stores. */

@@ -10,6 +10,7 @@ import { fromLocalInput } from "@/lib/format";
 import type { LpEvent } from "@/lib/lp-events";
 import { isStatus, parseMoney, type HistoryEntry, type Lead, type Status, type Template } from "@/lib/leads";
 import { normalizePhone } from "@/lib/normalize";
+import type { SheetColumn } from "@/lib/sheet-columns";
 import { loginClient, lockedMessage } from "@/lib/server";
 import { requireWorkspace, SESSION_COOKIE } from "@/lib/session";
 
@@ -108,6 +109,41 @@ export async function updateLeadField(
     if (error instanceof DbError && error.code === "22023") return { error: "Informe o motivo da perda." };
     return { error: "Não foi possível salvar." };
   }
+}
+
+/** Saves a column the admin added (text the attendant fills in). */
+export async function updateLeadCustomField(slug: string, leadId: string, key: string, raw: string): Promise<{ value?: string; error?: string }> {
+  const { token } = await requireWorkspace(slug);
+  const value = raw.trim().slice(0, 500);
+  try {
+    const lead = await call<Lead>("lh_update_lead", { p_token: token, p_lead_id: leadId, p_patch: { fields: { [key]: value } } });
+    const stored = lead.extra?.[key];
+    return { value: stored === null || stored === undefined ? "" : String(stored) };
+  } catch (error) {
+    if (error instanceof DbError && error.code === "LH404") return { error: "Lead não encontrado." };
+    if (error instanceof DbError && error.code === "22023") return { error: "Esta coluna não existe mais." };
+    return { error: "Não foi possível salvar." };
+  }
+}
+
+/** Column settings of the sheet (admin only). */
+export async function saveSheetColumns(slug: string, columns: SheetColumn[]): Promise<{ error?: string }> {
+  const { token } = await requireWorkspace(slug);
+  const clean = columns.slice(0, 150).map((c) => ({
+    key: String(c.key).trim().slice(0, 120),
+    label: String(c.label ?? "").trim().slice(0, 120),
+    kind: c.kind,
+    hidden: Boolean(c.hidden),
+  }));
+  try {
+    await call("lh_set_sheet_columns", { p_token: token, p_columns: clean });
+  } catch (error) {
+    if (error instanceof DbError && error.code === "LH403") return { error: "Só o administrador pode mudar as colunas." };
+    if (error instanceof DbError && error.code === "22023") return { error: "Confira os nomes: não pode haver duas colunas iguais." };
+    return { error: "Não foi possível salvar." };
+  }
+  revalidatePath(`/w/${slug}`, "layout");
+  return {};
 }
 
 /** Status change; "perdido" needs a reason. */
