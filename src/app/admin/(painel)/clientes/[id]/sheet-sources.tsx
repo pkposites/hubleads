@@ -91,7 +91,11 @@ export function SheetSources({ workspaceId, sources }: { workspaceId: string; so
           <p className="font-medium text-emerald-900">Copie o script agora: a chave dentro dele não aparece de novo.</p>
           <ol className="list-decimal space-y-1 pl-5 text-emerald-900">
             <li>Abra a planilha que recebe os leads → menu <strong>Extensões → Apps Script</strong>.</li>
-            <li>Apague o que estiver no editor, cole o script e clique em <strong>Salvar</strong> (ícone de disquete).</li>
+            <li>
+              O editor já vem com <code>function myFunction() {"{ }"}</code>. Clique dentro do código, aperte{" "}
+              <strong>Ctrl+A</strong> (no Mac, <strong>Cmd+A</strong>) e <strong>Delete</strong> para deixar o editor{" "}
+              <strong>totalmente vazio</strong>. Só então cole o script e clique em <strong>Salvar</strong> (ícone de disquete).
+            </li>
             <li>
               No seletor de função, no topo, escolha <strong>instalar</strong> e clique em <strong>Executar</strong>. Autorize com a
               sua conta Google. Se aparecer &quot;app não verificado&quot;, use <em>Avançado → Acessar</em>.
@@ -101,6 +105,10 @@ export function SheetSources({ workspaceId, sources }: { workspaceId: string; so
               Repetidos não entram duas vezes.
             </li>
           </ol>
+          <p className="text-emerald-900">
+            <strong>Não aparece &quot;instalar&quot; no seletor, só &quot;myFunction&quot;?</strong> O script foi colado dentro
+            da função que já existia. Apague tudo (Ctrl+A e Delete), cole de novo e salve.
+          </p>
           <div className="flex justify-end">
             <CopyButton text={script} label="Copiar script" />
           </div>

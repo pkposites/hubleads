@@ -26,7 +26,9 @@ Meta Lead Ads (API) ─────────► rotina de 1 minuto ───�
 No painel mãe, cliente → **Fontes de leads → Google Sheets** → **Gerar
 script**. Cada planilha tem uma chave própria (mostrada uma vez, guardada só
 como hash; dá para pausar, trocar a chave ou remover). O script, colado em
-Extensões → Apps Script da planilha, roda a cada minuto e manda as linhas novas
+Extensões → Apps Script da planilha (com o editor totalmente vazio: apague o
+`function myFunction() { }` que já vem lá, senão o código fica dentro dela e
+"instalar" não aparece no seletor), roda a cada minuto e manda as linhas novas
 para `/api/sources/sheets` (até 100 por vez). `instalar` começa pelas linhas
 novas; `importarTudo` manda também as antigas. Linhas com o ID de lead da Meta
 (coluna `id`, com ou sem o prefixo `l:`) viram "Formulário Meta" e voltam para

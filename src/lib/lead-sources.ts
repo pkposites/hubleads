@@ -148,8 +148,10 @@ export function mapSheetRow(row: Record<string, unknown>, sourceId: string): Sou
 /** The Apps Script the admin pastes in the sheet (Extensões → Apps Script). */
 export function appsScript(endpoint: string, key: string) {
   return `// Lead Hub: envia as linhas novas desta planilha para o Lead Hub, a cada minuto.
-// 1. Cole este código em Extensões → Apps Script (apague o que estiver lá) e salve.
+// 1. Em Extensões → Apps Script, deixe o editor TOTALMENTE VAZIO (Ctrl+A / Cmd+A e Delete,
+//    inclusive o "function myFunction() { }" que já vem lá). Só então cole este código e salve.
 // 2. No menu de funções, escolha "instalar" e clique em Executar. Autorize com a sua conta Google.
+//    Se o menu mostrar só "myFunction", o código foi colado dentro dela: apague tudo e cole de novo.
 // Pronto: a partir daí, cada linha nova (ex.: lead do formulário da Meta) vai para o Lead Hub.
 // Para mandar também as linhas que já estão na planilha, execute "importarTudo" uma vez.
 
