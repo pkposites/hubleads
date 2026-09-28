@@ -15,6 +15,10 @@ export interface SheetColumn {
 
 export interface SheetConfig {
   columns: SheetColumn[];
+  /** The client's internal steps. */
+  stages: string[];
+  /** Statuses that are sent to Meta (the panel asks before them). */
+  meta: { schedule: boolean; purchase: boolean };
   /** Answers found in the client's recent leads, most common first. */
   answers: { key: string; leads: number }[];
 }

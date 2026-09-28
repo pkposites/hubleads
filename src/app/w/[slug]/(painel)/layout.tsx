@@ -24,7 +24,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
   const columns = resolveColumns(sheet.columns, sheet.answers);
 
   return (
-    <PanelProvider value={{ slug, company: workspace.name, templates, isAdmin: asAdmin, columns, answers: sheet.answers }}>
+    <PanelProvider value={{ slug, company: workspace.name, templates, isAdmin: asAdmin, columns, answers: sheet.answers, stages: sheet.stages ?? [], meta: sheet.meta ?? { schedule: false, purchase: false } }}>
       <div className="flex flex-1 flex-col">
         <AutoRefresh />
         <NewLeadAlert latest={counts.latest} waiting={counts.waiting} />

@@ -5,10 +5,10 @@ import { Button } from "@/components/ui";
 import { channelLabel } from "@/lib/attribution";
 import { sourceLabel } from "@/lib/source-labels";
 import { formatDateTime, timeSince } from "@/lib/format";
-import { adNames, type Lead } from "@/lib/leads";
+import { adNames, COLORS, type Lead } from "@/lib/leads";
 import { answerValue, dataColumns, showsFixed, type SheetColumn } from "@/lib/sheet-columns";
 import { deleteLeads } from "../actions";
-import { EventChips, FieldCell, HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StatusCell, TextCell, WaitTimer, WhatsAppButton } from "./lead-fields";
+import { ColorCell, EventChips, FieldCell, HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StageCell, StatusCell, TextCell, WaitTimer, WhatsAppButton } from "./lead-fields";
 import { usePanel } from "./panel-context";
 
 const path = (url: string | null) => {
@@ -69,7 +69,11 @@ export function LeadCard({
   const custom = fields.filter((c) => c.kind === "custom");
   const answers = fields.filter((c) => c.kind === "answer").map((c) => [c.label, answerValue(lead.extra?.[c.key])]);
   return (
-    <li className={`rounded-lg border bg-white p-3 ${selected ? "border-red-300 bg-red-50/50" : "border-zinc-200"}`}>
+    <li
+      className={`rounded-lg border bg-white p-3 ${selected ? "border-red-300 bg-red-50/50" : "border-zinc-200"} ${
+        lead.color ? `border-l-4 ${COLORS[lead.color].border}` : ""
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {selectable && (
@@ -104,6 +108,10 @@ export function LeadCard({
             <TextCell lead={lead} field="phone" placeholder="Preencher telefone" display={phoneDisplay} className="w-full" />
           </div>
           <WhatsAppButton lead={lead} />
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <StageCell lead={lead} className="w-full" />
+          <ColorCell lead={lead} />
         </div>
         <div className="grid grid-cols-2 gap-2">
           <StatusCell lead={lead} />
@@ -285,6 +293,8 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
               ["nome", "Nome"],
               ["telefone", "Telefone"],
               ["status", "Status"],
+              ["cor", "Qualidade"],
+              ["etapa", "Etapa"],
               ["retorno", "Retorno"],
               ["valor", "Valor"],
               ...(show("lp_events") ? [["lp_events", label("lp_events")]] : []),
@@ -302,7 +312,10 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
         </thead>
         <tbody className="divide-y divide-zinc-100">
           {leads.map((lead) => (
-            <tr key={lead.id} className={`align-top hover:bg-zinc-50/60 ${selected.has(lead.id) ? "bg-red-50/60" : ""}`}>
+            <tr
+              key={lead.id}
+              className={`align-top ${selected.has(lead.id) ? "bg-red-50/60" : lead.color ? COLORS[lead.color].row : "hover:bg-zinc-50/60"}`}
+            >
               {canDelete && (
                 <td className="px-2 py-2">
                   <input
@@ -333,6 +346,12 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
               </td>
               <td className="px-2 py-1">
                 <StatusCell lead={lead} />
+              </td>
+              <td className="px-2 py-1.5">
+                <ColorCell lead={lead} />
+              </td>
+              <td className="px-1 py-1">
+                <StageCell lead={lead} />
               </td>
               <td className="w-44 px-1 py-1">
                 <NextContactCell lead={lead} className="w-44" />

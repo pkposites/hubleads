@@ -13,6 +13,8 @@ interface Panel {
   columns: SheetColumn[];
   /** Answers found in recent leads, for the column settings. */
   answers: { key: string; leads: number }[];
+  stages: string[];
+  meta: { schedule: boolean; purchase: boolean };
 }
 
 const PanelContext = createContext<Panel | null>(null);

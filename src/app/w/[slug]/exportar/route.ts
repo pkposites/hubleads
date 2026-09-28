@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { CHANNELS } from "@/lib/attribution";
 import { call } from "@/lib/db";
-import { isStatus, leadsToCsv, type Lead } from "@/lib/leads";
+import { isColor, isStatus, leadsToCsv, type Lead } from "@/lib/leads";
 import { resolveColumns, type SheetConfig } from "@/lib/sheet-columns";
 import { SOURCE_LABELS } from "@/lib/source-labels";
 import { periodArgs, resolvePeriod } from "@/lib/period";
@@ -20,6 +20,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
   const status = sp.get("status");
   const channel = sp.get("origem");
   const source = sp.get("fonte");
+  const stage = sp.get("etapa")?.slice(0, 60) || null;
+  const color = sp.get("cor");
 
   const rows: Lead[] = [];
   for (let offset = 0; offset < 50_000; offset += 1000) {
@@ -29,6 +31,8 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
       p_status: isStatus(status) ? status : null,
       p_channel: channel && channel in CHANNELS ? channel : null,
       p_source: source && source in SOURCE_LABELS ? source : null,
+      p_stage: stage,
+      p_color: isColor(color) || color === "-" ? color : null,
       p_search: sp.get("q") || null,
       p_limit: 1000,
       p_offset: offset,
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/w/[slug]/exp
   await call("lh_log_export", {
     p_token: session.token,
     p_rows: rows.length,
-    p_filters: { ...period.query, status: status ?? null, origem: channel ?? null, fonte: source ?? null, busca: Boolean(sp.get("q")) },
+    p_filters: { ...period.query, status: status ?? null, origem: channel ?? null, fonte: source ?? null, etapa: stage, cor: color ?? null, busca: Boolean(sp.get("q")) },
   });
 
   const config = await call<SheetConfig>("lh_sheet_config", { p_token: session.token });

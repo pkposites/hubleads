@@ -53,9 +53,24 @@ export interface Lead {
   first_contact_at: string | null;
   next_contact_at: string | null;
   lost_reason: string | null;
+  /** Internal step (never sent to Meta). */
+  stage: string | null;
+  /** Good / medium / bad mark. */
+  color: LeadColor | null;
   created_at: string;
   updated_at: string;
 }
+
+/** Marks for good and bad leads (only for the team). */
+export const COLORS = {
+  verde: { label: "Bom", dot: "bg-emerald-500", row: "bg-emerald-50/70", border: "border-l-emerald-500" },
+  amarelo: { label: "Médio", dot: "bg-amber-400", row: "bg-amber-50/70", border: "border-l-amber-400" },
+  vermelho: { label: "Ruim", dot: "bg-red-500", row: "bg-red-50/70", border: "border-l-red-500" },
+} as const;
+
+export type LeadColor = keyof typeof COLORS;
+
+export const isColor = (value: unknown): value is LeadColor => typeof value === "string" && Object.hasOwn(COLORS, value);
 
 export const LOST_REASONS = [
   "Sem resposta",
@@ -209,6 +224,8 @@ const CSV_COLUMNS: [string, (l: Lead) => unknown][] = [
   ["Motivo da perda", (l) => l.lost_reason],
   ["Próximo contato", (l) => l.next_contact_at],
   ["Primeiro contato", (l) => l.first_contact_at],
+  ["Etapa", (l) => l.stage],
+  ["Qualidade", (l) => (l.color ? COLORS[l.color].label : "")],
   ["Origem", (l) => channelLabel(l.channel)],
   ["Campanha", (l) => adNames(l).campaign],
   ["Conjunto", (l) => adNames(l).adset],

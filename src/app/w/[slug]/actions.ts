@@ -8,7 +8,7 @@ import { sendLeadConversions } from "@/lib/conversions";
 import { call, DbError } from "@/lib/db";
 import { fromLocalInput } from "@/lib/format";
 import type { LpEvent } from "@/lib/lp-events";
-import { isStatus, parseMoney, type HistoryEntry, type Lead, type Status, type Template } from "@/lib/leads";
+import { isColor, isStatus, parseMoney, type HistoryEntry, type Lead, type Status, type Template } from "@/lib/leads";
 import { normalizePhone } from "@/lib/normalize";
 import type { SheetColumn } from "@/lib/sheet-columns";
 import { loginClient, lockedMessage } from "@/lib/server";
@@ -48,7 +48,7 @@ export async function logout(slug: string) {
   redirect(`/w/${slug}/entrar`);
 }
 
-export type EditableField = "name" | "phone" | "status" | "notes" | "sale_value" | "next_contact_at";
+export type EditableField = "name" | "phone" | "status" | "notes" | "sale_value" | "next_contact_at" | "stage" | "color";
 
 /**
  * Booked or sold leads may owe an event to Meta (sent after the response).
@@ -96,6 +96,12 @@ export async function updateLeadField(
     case "name":
     case "notes":
       break;
+    case "stage":
+      value = String(value).slice(0, 60);
+      break;
+    case "color":
+      if (value && !isColor(value)) return { error: "Cor inválida." };
+      break;
     default:
       return { error: "Campo não editável." };
   }
@@ -106,7 +112,9 @@ export async function updateLeadField(
     return { value: lead[field] };
   } catch (error) {
     if (error instanceof DbError && error.code === "LH404") return { error: "Lead não encontrado." };
-    if (error instanceof DbError && error.code === "22023") return { error: "Informe o motivo da perda." };
+    if (error instanceof DbError && error.code === "22023") {
+      return { error: field === "stage" ? "Esta etapa não existe mais." : field === "color" ? "Cor inválida." : "Informe o motivo da perda." };
+    }
     return { error: "Não foi possível salvar." };
   }
 }
@@ -124,6 +132,21 @@ export async function updateLeadCustomField(slug: string, leadId: string, key: s
     if (error instanceof DbError && error.code === "22023") return { error: "Esta coluna não existe mais." };
     return { error: "Não foi possível salvar." };
   }
+}
+
+/** The client's internal steps (admin only). */
+export async function saveStages(slug: string, stages: string[]): Promise<{ error?: string }> {
+  const { token } = await requireWorkspace(slug);
+  const clean = stages.map((s) => String(s).trim().slice(0, 60)).filter(Boolean).slice(0, 20);
+  try {
+    await call("lh_set_stages", { p_token: token, p_stages: clean });
+  } catch (error) {
+    if (error instanceof DbError && error.code === "LH403") return { error: "Só o administrador pode mudar as etapas." };
+    if (error instanceof DbError && error.code === "22023") return { error: "Confira as etapas: não pode haver duas iguais." };
+    return { error: "Não foi possível salvar." };
+  }
+  revalidatePath(`/w/${slug}`, "layout");
+  return {};
 }
 
 /** Column settings of the sheet (admin only). */
@@ -152,16 +175,24 @@ export async function setLeadStatus(
   leadId: string,
   status: Status,
   lostReason?: string,
+  saleValue?: string,
 ): Promise<{ lead?: Lead; error?: string }> {
   const { token } = await requireWorkspace(slug);
   if (!isStatus(status)) return { error: "Status inválido." };
   const reason = lostReason?.trim().slice(0, 200) ?? "";
   if (status === "perdido" && !reason) return { error: "Informe o motivo da perda." };
+  const patch: Record<string, unknown> = status === "perdido" ? { status, lost_reason: reason } : { status };
+  // A sale confirmed together with its value (Meta only counts a Purchase with a value).
+  if (status === "venda" && saleValue !== undefined && saleValue.trim()) {
+    const money = parseMoney(saleValue);
+    if (money === "invalid") return { error: "Valor inválido." };
+    patch.sale_value = money ?? "";
+  }
   try {
     const lead = await call<Lead>("lh_update_lead", {
       p_token: token,
       p_lead_id: leadId,
-      p_patch: status === "perdido" ? { status, lost_reason: reason } : { status },
+      p_patch: patch,
     });
     afterSave(lead);
     return { lead };

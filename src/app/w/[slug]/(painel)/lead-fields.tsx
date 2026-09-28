@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Button, inputClass } from "@/components/ui";
 import { formatDateTime, formatMoney, formatPhone, formatWhen, localAt, toLocalInput } from "@/lib/format";
-import { fillTemplate, formatMinutes, LOST_REASONS, STATUSES, type HistoryEntry, type Lead, type Status } from "@/lib/leads";
+import { COLORS, fillTemplate, formatMinutes, isColor, LOST_REASONS, parseMoney, STATUSES, type HistoryEntry, type Lead, type LeadColor, type Status } from "@/lib/leads";
 import { eventLabel, type LpEvent } from "@/lib/lp-events";
 import { whatsappDigits } from "@/lib/normalize";
 import { answerLabel } from "@/lib/sheet-columns";
@@ -201,25 +201,27 @@ function LostReasonDialog({ onCancel, onConfirm, pending, error }: { onCancel: (
 }
 
 export function StatusCell({ lead }: { lead: Lead }) {
-  const { slug } = usePanel();
+  const { slug, meta } = usePanel();
   const [status, setStatus] = useSynced<Status>(lead.status);
   const [reason, setReason] = useSynced(lead.lost_reason);
   const [asking, setAsking] = useState(false);
+  const [confirming, setConfirming] = useState<"agendado" | "venda" | null>(null);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const refresh = useBackgroundRefresh();
 
-  const apply = (next: Status, lostReason?: string) => {
+  const apply = (next: Status, lostReason?: string, saleValue?: string) => {
     const previous = status;
     setStatus(next);
     start(async () => {
-      const result = await setLeadStatus(slug, lead.id, next, lostReason);
+      const result = await setLeadStatus(slug, lead.id, next, lostReason, saleValue);
       if (result.error) {
         setError(result.error);
         setStatus(previous);
       } else {
         setError(null);
         setAsking(false);
+        setConfirming(null);
         setReason(result.lead?.lost_reason ?? null);
         refresh();
       }
@@ -234,6 +236,8 @@ export function StatusCell({ lead }: { lead: Lead }) {
         onChange={(e) => {
           const next = e.target.value as Status;
           if (next === "perdido") setAsking(true);
+          // Statuses that go to Meta are confirmed first (they cannot be taken back there).
+          else if ((next === "agendado" && meta.schedule) || (next === "venda" && meta.purchase)) setConfirming(next);
           else apply(next);
         }}
         className={`rounded px-2 py-1.5 text-base font-medium md:py-1 md:text-sm ${STATUS_STYLE[status]} ${pending ? "opacity-70" : ""}`}
@@ -257,6 +261,142 @@ export function StatusCell({ lead }: { lead: Lead }) {
           onConfirm={(r) => apply("perdido", r)}
         />
       )}
+      {confirming && (
+        <MetaStatusDialog
+          lead={lead}
+          status={confirming}
+          pending={pending}
+          error={error}
+          onCancel={() => {
+            setConfirming(null);
+            setError(null);
+          }}
+          onConfirm={(value) => apply(confirming, undefined, value)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Asks before a status that is sent to Meta; a sale also takes its value. */
+function MetaStatusDialog({
+  lead,
+  status,
+  pending,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  lead: Lead;
+  status: "agendado" | "venda";
+  pending: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: (saleValue?: string) => void;
+}) {
+  const [value, setValue] = useState(lead.sale_value ? moneyDisplay(lead.sale_value) : "");
+  const money = status === "venda" ? parseMoney(value) : null;
+  const sale = status === "venda";
+  return (
+    <BottomSheet title={sale ? "Confirmar venda?" : "Confirmar agendamento?"} onClose={onCancel}>
+      <div className="flex flex-col gap-3 text-sm">
+        <p>
+          <strong>{lead.name ?? lead.code}</strong> vai para <strong>{STATUSES[status]}</strong> e isso é enviado à Meta como{" "}
+          <strong>{sale ? "Compra (Purchase)" : "Agendamento (Schedule)"}</strong>.
+        </p>
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+          Confira antes: depois de enviado, o evento não pode ser desfeito na Meta, mesmo que o status mude aqui.
+        </p>
+        {sale && (
+          <label className="flex flex-col gap-1">
+            <span className="font-medium">Valor da venda (R$)</span>
+            <input
+              value={value}
+              inputMode="decimal"
+              placeholder="Ex.: 850.000,00"
+              onChange={(e) => setValue(e.target.value)}
+              className={inputClass}
+              autoFocus
+            />
+            <span className="text-xs text-zinc-500">
+              {money === "invalid"
+                ? "Valor inválido."
+                : money
+                  ? `Vai como ${moneyDisplay(money)}.`
+                  : "Sem valor, a venda fica registrada aqui mas não é enviada à Meta."}
+            </span>
+          </label>
+        )}
+        {error && <p className="text-red-700">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onCancel} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button onClick={() => onConfirm(sale ? value : undefined)} disabled={pending || money === "invalid"}>
+            {pending ? "Salvando..." : sale ? "Confirmar venda" : "Confirmar agendamento"}
+          </Button>
+        </div>
+      </div>
+    </BottomSheet>
+  );
+}
+
+/** Internal step of the client's process (never sent to Meta). */
+export function StageCell({ lead, className = "w-40" }: { lead: Lead; className?: string }) {
+  const { stages } = usePanel();
+  const [value, setValue] = useSynced(lead.stage ?? "");
+  const { pending, error, save } = useSave(lead.id, "stage");
+  const options = value && !stages.includes(value) ? [...stages, value] : stages;
+  return (
+    <div className="flex flex-col">
+      <select
+        aria-label="Etapa"
+        value={value}
+        onChange={(e) => {
+          const previous = value;
+          setValue(e.target.value);
+          save(e.target.value, (stored) => setValue((stored as string | null) ?? ""), () => setValue(previous));
+        }}
+        className={`${className} rounded border border-zinc-200 bg-white px-2 py-1.5 text-base md:py-1 md:text-sm ${value ? "" : "text-zinc-400"} ${pending ? "opacity-60" : ""}`}
+      >
+        <option value="">Sem etapa</option>
+        {options.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+      {error && <span className="text-xs text-red-700">{error}</span>}
+    </div>
+  );
+}
+
+/** Good / medium / bad mark; the row takes the colour. */
+export function ColorCell({ lead }: { lead: Lead }) {
+  const [value, setValue] = useSynced<LeadColor | null>(lead.color);
+  const { pending, error, save } = useSave(lead.id, "color");
+  const pick = (next: LeadColor) => {
+    const previous = value;
+    const target = value === next ? null : next;
+    setValue(target);
+    save(target ?? "", (stored) => setValue(isColor(stored) ? stored : null), () => setValue(previous));
+  };
+  return (
+    <div className="flex flex-col">
+      <div className={`flex items-center gap-1 ${pending ? "opacity-60" : ""}`} role="group" aria-label="Qualidade do lead">
+        {(Object.keys(COLORS) as LeadColor[]).map((c) => (
+          <button
+            key={c}
+            type="button"
+            title={COLORS[c].label}
+            aria-label={COLORS[c].label}
+            aria-pressed={value === c}
+            onClick={() => pick(c)}
+            className={`size-6 rounded-full border-2 md:size-5 ${COLORS[c].dot} ${value === c ? "border-zinc-900 ring-2 ring-white" : "border-transparent opacity-30 hover:opacity-70"}`}
+          />
+        ))}
+      </div>
+      {error && <span className="text-xs text-red-700">{error}</span>}
     </div>
   );
 }
@@ -452,6 +592,10 @@ export function describeHistory(h: HistoryEntry): string {
       return `WhatsApp aberto: ${h.to}`;
     case "meta":
       return `Meta: ${h.to}`;
+    case "stage":
+      return h.to ? `Etapa: ${h.to}` : "Etapa removida";
+    case "color":
+      return h.to && isColor(h.to) ? `Marcado como ${COLORS[h.to].label}` : "Marcação de cor removida";
     case "field":
       return h.to ? `${answerLabel(h.from ?? "")}: ${h.to}` : `${answerLabel(h.from ?? "")} apagado`;
     default:

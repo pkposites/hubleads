@@ -4,7 +4,7 @@ import { CHANNELS } from "@/lib/attribution";
 import { SOURCE_LABELS, sourceLabel } from "@/lib/source-labels";
 import { call } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
-import { formatRate, isStatus, rate, STATUSES, type Lead, type Stats } from "@/lib/leads";
+import { COLORS, formatRate, isColor, isStatus, rate, STATUSES, type Lead, type Stats } from "@/lib/leads";
 import { countTrend, formatRange, periodArgs, rateTrend, resolvePeriod, type Trend } from "@/lib/period";
 import { TrendLine } from "@/components/trend";
 import { requireWorkspace } from "@/lib/session";
@@ -34,9 +34,11 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
   const channel = first(sp.origem) in CHANNELS ? first(sp.origem) : "";
   const source = first(sp.fonte) in SOURCE_LABELS ? first(sp.fonte) : "";
   const q = first(sp.q).trim().slice(0, 100);
+  const stage = first(sp.etapa).slice(0, 60);
+  const color = isColor(first(sp.cor)) || first(sp.cor) === "-" ? first(sp.cor) : "";
 
   const { token } = await requireWorkspace(slug);
-  const [stats, previous, list] = await Promise.all([
+  const [stats, previous, list, sheet] = await Promise.all([
     call<Stats>("lh_stats", { p_token: token, ...periodArgs(period) }),
     period.previous ? call<Stats>("lh_stats", { p_token: token, ...periodArgs(period.previous) }) : null,
     call<{ total: number; rows: Lead[] }>("lh_list_leads", {
@@ -45,10 +47,13 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
       p_status: status || null,
       p_channel: channel || null,
       p_source: source || null,
+      p_stage: stage || null,
+      p_color: color || null,
       p_search: q || null,
       p_limit: 500,
       p_offset: 0,
     }),
+    call<{ stages: string[] }>("lh_sheet_config", { p_token: token }),
   ]);
 
   const lpEvents = list.rows.length
@@ -60,6 +65,8 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
     ...(status && { status }),
     ...(channel && { origem: channel }),
     ...(source && { fonte: source }),
+    ...(stage && { etapa: stage }),
+    ...(color && { cor: color }),
     ...(q && { q }),
   });
   const bySource = (stats.by_source ?? []).filter((s) => s.leads > 0);
@@ -131,6 +138,24 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
               </option>
             ))}
           </select>
+          <select name="etapa" defaultValue={stage} className={`${controlClass} sm:w-44`} aria-label="Etapa">
+            <option value="">Todas as etapas</option>
+            <option value="-">Sem etapa</option>
+            {[...sheet.stages, ...(stage && stage !== "-" && !sheet.stages.includes(stage) ? [stage] : [])].map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <select name="cor" defaultValue={color} className={`${controlClass} sm:w-40`} aria-label="Qualidade">
+            <option value="">Todas as cores</option>
+            {Object.entries(COLORS).map(([k, c]) => (
+              <option key={k} value={k}>
+                {c.label}
+              </option>
+            ))}
+            <option value="-">Sem cor</option>
+          </select>
           <input name="q" defaultValue={q} placeholder="Código, nome, telefone, campanha" className={`${controlClass} col-span-2 sm:w-64`} />
           <button className={`${buttonClass("secondary")} col-span-2 sm:col-span-1`}>Filtrar</button>
         </form>
@@ -144,8 +169,8 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
       </div>
 
       {list.rows.length === 0 ? (
-        <EmptyState title={q || status || channel || source ? "Nenhum lead com esses filtros" : "Nenhum lead ainda"}>
-          {!(q || status || channel || source) &&
+        <EmptyState title={q || status || channel || source || stage || color ? "Nenhum lead com esses filtros" : "Nenhum lead ainda"}>
+          {!(q || status || channel || source || stage || color) &&
             "Assim que um lead chegar (clique no WhatsApp da LP, formulário ou planilha), a linha aparece aqui."}
         </EmptyState>
       ) : (

@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button, inputClass } from "@/components/ui";
 import { answerLabel, type SheetColumn } from "@/lib/sheet-columns";
-import { saveSheetColumns } from "../actions";
+import { saveSheetColumns, saveStages } from "../actions";
 import { BottomSheet } from "./bottom-sheet";
 import { usePanel } from "./panel-context";
 
-/** Admin only: rename, hide, reorder and add columns of the sheet. */
+/** Admin only: rename, hide, reorder and add columns of the sheet; edit the steps. */
 export function SheetColumnsButton() {
   const { isAdmin } = usePanel();
   const [open, setOpen] = useState(false);
@@ -16,7 +16,7 @@ export function SheetColumnsButton() {
   return (
     <>
       <Button variant="secondary" onClick={() => setOpen(true)}>
-        Colunas
+        Colunas e etapas
       </Button>
       {open && <ColumnsDialog onClose={() => setOpen(false)} />}
     </>
@@ -24,7 +24,9 @@ export function SheetColumnsButton() {
 }
 
 function ColumnsDialog({ onClose }: { onClose: () => void }) {
-  const { slug, columns: initial, answers } = usePanel();
+  const { slug, columns: initial, answers, stages: initialStages } = usePanel();
+  const [stages, setStages] = useState<string[]>(initialStages);
+  const [newStage, setNewStage] = useState("");
   const router = useRouter();
   const [columns, setColumns] = useState<SheetColumn[]>(initial);
   const [newName, setNewName] = useState("");
@@ -56,11 +58,35 @@ function ColumnsDialog({ onClose }: { onClose: () => void }) {
     setColumns((all) => [...all.filter((c) => c.kind !== "fixed"), { key: name, label: name, kind: "custom", hidden: false }, ...all.filter((c) => c.kind === "fixed")]);
     setNewName("");
   };
+  const addStage = () => {
+    const name = newStage.trim().slice(0, 60);
+    if (!name) return;
+    if (stages.some((s) => s.toLowerCase() === name.toLowerCase())) {
+      setError("Essa etapa já existe.");
+      return;
+    }
+    if (stages.length >= 20) {
+      setError("No máximo 20 etapas.");
+      return;
+    }
+    setError(null);
+    setStages((all) => [...all, name]);
+    setNewStage("");
+  };
+  const moveStage = (i: number, step: -1 | 1) =>
+    setStages((all) => {
+      const j = i + step;
+      if (j < 0 || j >= all.length) return all;
+      const next = [...all];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
   const save = () =>
     start(async () => {
       const result = await saveSheetColumns(slug, columns);
-      if (result.error) {
-        setError(result.error);
+      const steps = result.error ? result : await saveStages(slug, stages);
+      if (steps.error) {
+        setError(steps.error);
         return;
       }
       onClose();
@@ -68,8 +94,58 @@ function ColumnsDialog({ onClose }: { onClose: () => void }) {
     });
 
   return (
-    <BottomSheet title="Colunas da planilha" onClose={onClose}>
+    <BottomSheet title="Colunas e etapas" onClose={onClose}>
       <div className="flex flex-col gap-4 text-sm">
+        <section className="flex flex-col gap-2">
+          <div>
+            <h3 className="font-medium">Etapas do atendimento</h3>
+            <p className="text-xs text-zinc-500">
+              Para a equipe se organizar (ex.: Enviou material, Visita marcada). Não mudam o status e não vão para a Meta.
+            </p>
+          </div>
+          <ul className="flex flex-col gap-1">
+            {stages.map((stage, i) => (
+              <li key={stage} className="flex items-center gap-1 rounded-md border border-zinc-200 px-2 py-1">
+                <span className="flex-1 truncate">{stage}</span>
+                <button type="button" className="px-1.5 text-zinc-500 disabled:opacity-30" disabled={i === 0} onClick={() => moveStage(i, -1)} aria-label={`Subir ${stage}`}>
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="px-1.5 text-zinc-500 disabled:opacity-30"
+                  disabled={i === stages.length - 1}
+                  onClick={() => moveStage(i, 1)}
+                  aria-label={`Descer ${stage}`}
+                >
+                  ↓
+                </button>
+                <button type="button" className="px-1.5 text-xs text-red-700 hover:underline" onClick={() => setStages((all) => all.filter((s) => s !== stage))}>
+                  Remover
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
+            <input
+              value={newStage}
+              maxLength={60}
+              placeholder="Nova etapa (ex.: Visita marcada)"
+              onChange={(e) => setNewStage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addStage();
+                }
+              }}
+              className={inputClass}
+            />
+            <Button variant="secondary" onClick={addStage} disabled={!newStage.trim()}>
+              Adicionar
+            </Button>
+          </div>
+          <p className="text-xs text-zinc-500">Leads numa etapa removida continuam com ela até alguém mudar.</p>
+        </section>
+
         <section className="flex flex-col gap-2">
           <div>
             <h3 className="font-medium">Respostas e colunas próprias</h3>
