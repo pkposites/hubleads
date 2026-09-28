@@ -1,12 +1,15 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
 import { clientIp } from "@/lib/collect";
 import { sendTestConversion } from "@/lib/conversions";
-import { encryptSecret } from "@/lib/crypto";
+import { decryptSecret, encryptSecret } from "@/lib/crypto";
+import { explainGraphError, listForms, listPages } from "@/lib/meta-leads";
+import { syncMetaForms } from "@/lib/meta-lead-sync";
 import { mailReady, publicAppUrl, resetPasswordEmail, sendMail } from "@/lib/mail";
 import { encryptionKey, lockedMessage, loginClient, serverSecret } from "@/lib/server";
 import { call, DbError } from "@/lib/db";
@@ -354,4 +357,139 @@ export async function deleteClient(workspaceId: string, _prev: AdminFormState, f
   }
   revalidatePath("/admin");
   redirect(`/admin?apagado=${encodeURIComponent(name.trim())}`);
+}
+
+// ---------------------------------------------------------------------------
+// Meta native forms (Lead Ads)
+// ---------------------------------------------------------------------------
+
+/** Checks the token with Meta (lists its Pages), then saves it encrypted. */
+export async function saveLeadToken(workspaceId: string, _prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+  const { token } = await requireAdmin();
+  const plain = String(formData.get("lead_token") ?? "").trim();
+  if (!/^[A-Za-z0-9_-]{20,1000}$/.test(plain)) return { error: "Token inválido: cole o token do usuário do sistema (começa com EAA)." };
+  const key = encryptionKey();
+  if (!key) return { error: "O servidor ainda não tem a chave LH_ENCRYPTION_KEY; o token não foi salvo." };
+  let pages: { id: string; name: string }[];
+  try {
+    pages = await listPages(plain);
+  } catch (error) {
+    return { error: explainGraphError(error) };
+  }
+  try {
+    await call("lh_admin_set_lead_token", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_access_token: encryptSecret(plain, key),
+      p_token_hint: plain.slice(-4),
+    });
+  } catch {
+    return { error: "Não foi possível salvar." };
+  }
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+  return pages.length
+    ? { ok: `Token salvo. Páginas visíveis: ${pages.map((p) => p.name).join(", ")}.` }
+    : { error: "Token salvo, mas ele não enxerga nenhuma Página: atribua a Página ao usuário do sistema no Gerenciador de Negócios." };
+}
+
+export async function removeLeadToken(workspaceId: string): Promise<{ error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    await call("lh_admin_set_lead_token", { p_token: token, p_workspace_id: workspaceId, p_access_token: null, p_token_hint: null });
+  } catch {
+    return { error: "Não foi possível remover." };
+  }
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+  return {};
+}
+
+export type MetaPageForms = { id: string; name: string; forms: { id: string; name: string; status: string; leads: number | null }[]; error?: string };
+
+/** The client's Pages and their forms, read from Meta with the saved token. */
+export async function loadLeadForms(workspaceId: string): Promise<{ pages?: MetaPageForms[]; error?: string }> {
+  const { token } = await requireAdmin();
+  const secret = serverSecret();
+  const key = encryptionKey();
+  if (!secret || !key) return { error: "Servidor sem LH_SERVER_SECRET ou LH_ENCRYPTION_KEY." };
+  try {
+    // Checks that this admin may manage the client before using the server secret.
+    await call("lh_admin_get_lead_forms", { p_token: token, p_workspace_id: workspaceId });
+  } catch {
+    return { error: "Cliente não encontrado." };
+  }
+  const stored = await call<string | null>("lh_server_lead_token", { p_secret: secret, p_workspace_id: workspaceId });
+  if (!stored) return { error: "Salve o token primeiro." };
+  let plain: string;
+  try {
+    plain = decryptSecret(stored, key);
+  } catch {
+    return { error: "Não foi possível ler o token: salve-o de novo." };
+  }
+  try {
+    const pages = await listPages(plain);
+    const result: MetaPageForms[] = [];
+    for (const page of pages.slice(0, 20)) {
+      try {
+        result.push({ ...page, forms: await listForms(plain, page.id) });
+      } catch (error) {
+        result.push({ ...page, forms: [], error: explainGraphError(error) });
+      }
+    }
+    return { pages: result };
+  } catch (error) {
+    return { error: explainGraphError(error) };
+  }
+}
+
+/** Connects a form. importDays: how many past days to bring now (0 = only new leads). */
+export async function connectLeadForm(
+  workspaceId: string,
+  form: { page_id: string; page_name: string; form_id: string; form_name: string },
+  importDays: number,
+): Promise<{ error?: string }> {
+  const { token } = await requireAdmin();
+  const days = [0, 1, 7, 30, 90].includes(importDays) ? importDays : 0;
+  const since = Math.floor(Date.now() / 1000) - days * 86_400 + (days === 90 ? 3600 : 0);
+  try {
+    await call("lh_admin_set_lead_form", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_page_id: form.page_id,
+      p_page_name: form.page_name,
+      p_form_id: form.form_id,
+      p_form_name: form.form_name,
+      p_enabled: true,
+      p_since: since,
+    });
+  } catch {
+    return { error: "Não foi possível conectar o formulário." };
+  }
+  // First import right away instead of waiting for the next minute.
+  after(() => syncMetaForms(Date.now() + 20_000).then(() => undefined));
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+  return {};
+}
+
+export async function setLeadFormEnabled(
+  workspaceId: string,
+  form: { page_id: string; page_name: string | null; form_id: string; form_name: string | null },
+  enabled: boolean,
+): Promise<{ error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    await call("lh_admin_set_lead_form", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_page_id: form.page_id,
+      p_page_name: form.page_name ?? "",
+      p_form_id: form.form_id,
+      p_form_name: form.form_name ?? "",
+      p_enabled: enabled,
+      p_since: Math.floor(Date.now() / 1000),
+    });
+  } catch {
+    return { error: "Não foi possível alterar." };
+  }
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+  return {};
 }

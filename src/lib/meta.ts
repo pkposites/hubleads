@@ -32,7 +32,15 @@ export interface MetaLead {
   landing_url: string | null;
   /** false: the visitor refused tracking on the landing page (LGPD). */
   tracking_consent?: boolean | null;
+  /** Leads from Meta's native forms go back as CRM events with their lead id. */
+  source?: string | null;
+  meta_lead_id?: string | null;
+  email?: string | null;
+  created_at?: string | null;
 }
+
+/** Name of the CRM system in Meta's Conversion Leads setup. */
+export const CRM_SOURCE_NAME = "Lead Hub";
 
 export const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
@@ -68,6 +76,21 @@ export function userData(lead: MetaLead) {
   return data;
 }
 
+/** user_data of a CRM event: the Meta lead id plus hashed phone, e-mail and name. */
+export function crmUserData(lead: MetaLead) {
+  const data: Record<string, unknown> = { lead_id: lead.meta_lead_id };
+  const phone = normalizeMetaPhone(lead.phone);
+  if (phone) data.ph = [sha256(phone)];
+  const email = (lead.email ?? "").trim().toLowerCase();
+  if (email) data.em = [sha256(email)];
+  const parts = (lead.name ?? "").trim().split(/\s+/).map(normalizeName).filter(Boolean);
+  if (parts.length > 0) data.fn = [sha256(parts[0])];
+  if (parts.length > 1) data.ln = [sha256(parts[parts.length - 1])];
+  return data;
+}
+
+const isFormLead = (lead: MetaLead) => lead.source === "meta_form" && Boolean(lead.meta_lead_id);
+
 export interface MetaEvent {
   event_name: string;
   event_time: number;
@@ -97,18 +120,37 @@ export function dueEvents(
   // Nothing about people who refused tracking goes to Meta.
   if (lead.tracking_consent === false) return events;
   const at = statusAt ? new Date(statusAt) : now;
-  if (Number.isNaN(at.getTime()) || now.getTime() - at.getTime() > MAX_EVENT_AGE_MS) return events;
+  const statusTooOld = Number.isNaN(at.getTime()) || now.getTime() - at.getTime() > MAX_EVENT_AGE_MS;
   const value = lead.sale_value === null || lead.sale_value === "" ? null : Number(lead.sale_value);
-  const wanted: { name: string; custom?: Record<string, unknown> }[] = [];
-  if (lead.status === "agendado" && config.send_schedule) wanted.push({ name: META_EVENTS.agendado });
-  if (lead.status === "venda" && config.send_purchase && value !== null && value > 0) {
+  const wanted: { name: string; custom?: Record<string, unknown>; time?: Date }[] = [];
+  const crm = isFormLead(lead);
+  if (crm && !sent.includes("Lead") && lead.created_at) {
+    // The stage the lead enters with; Meta needs it to learn the funnel.
+    const created = new Date(lead.created_at);
+    if (!Number.isNaN(created.getTime()) && now.getTime() - created.getTime() <= MAX_EVENT_AGE_MS) wanted.push({ name: "Lead", time: created });
+  }
+  if (!statusTooOld && lead.status === "agendado" && config.send_schedule) wanted.push({ name: META_EVENTS.agendado });
+  if (!statusTooOld && lead.status === "venda" && config.send_purchase && value !== null && value > 0) {
     wanted.push({ name: META_EVENTS.venda, custom: { currency: "BRL", value } });
   }
   for (const w of wanted) {
     if (sent.includes(w.name)) continue;
+    const time = Math.floor(Math.min((w.time ?? at).getTime(), now.getTime()) / 1000);
+    if (crm) {
+      // Conversion Leads (CRM events): the Meta lead id identifies the person.
+      events.push({
+        event_name: w.name,
+        event_time: time,
+        event_id: `${lead.id}.${w.name}`,
+        action_source: "system_generated",
+        user_data: crmUserData(lead),
+        custom_data: { event_source: "crm", lead_event_source: CRM_SOURCE_NAME, ...w.custom },
+      });
+      continue;
+    }
     events.push({
       event_name: w.name,
-      event_time: Math.floor(Math.min(at.getTime(), now.getTime()) / 1000),
+      event_time: time,
       event_id: `${lead.id}.${w.name}`,
       // The booking and the sale happen in the WhatsApp conversation, not on
       // the site; the click ids (fbc/fbp) still link them to the ad.
@@ -122,13 +164,16 @@ export function dueEvents(
 
 export const graphVersion = () => process.env.META_GRAPH_VERSION || "v24.0";
 
+/** Graph API address; LH_META_GRAPH_URL points it at a fake server in end-to-end tests only. */
+export const graphBase = () => (process.env.LH_META_GRAPH_URL || "https://graph.facebook.com").replace(/\/$/, "");
+
 /** POSTs one event; returns whether Meta accepted it and a short, token-free response. */
 export async function sendMetaEvent(
   config: Pick<MetaConfig, "pixel_id" | "access_token" | "test_event_code">,
   event: MetaEvent,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: boolean; response: string }> {
-  const url = `https://graph.facebook.com/${graphVersion()}/${encodeURIComponent(config.pixel_id)}/events`;
+  const url = `${graphBase()}/${graphVersion()}/${encodeURIComponent(config.pixel_id)}/events`;
   const body = {
     data: [event],
     ...(config.test_event_code && { test_event_code: config.test_event_code }),
@@ -138,7 +183,9 @@ export async function sendMetaEvent(
     const res = await fetchImpl(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      // Meta wants lead_id as a number; it can exceed JavaScript's safe
+      // integers, so it is written as digits straight into the JSON.
+      body: JSON.stringify(body).replace(/"lead_id":"(\d{5,30})"/g, '"lead_id":$1'),
       signal: AbortSignal.timeout(10_000),
     });
     const text = (await res.text()).slice(0, 1000);

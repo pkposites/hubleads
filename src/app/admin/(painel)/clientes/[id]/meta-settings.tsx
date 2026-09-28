@@ -44,7 +44,8 @@ export function MetaSettings({
       <p className="text-sm text-zinc-600">
         Quando o atendente marca um lead como <strong>Agendado</strong>, o Lead Hub envia o evento <code>Schedule</code>; quando marca{" "}
         <strong>Venda</strong> com valor, envia <code>Purchase</code> com o valor. Cada evento vai uma vez por lead, com telefone e nome
-        criptografados (SHA-256), fbc, fbp, IP e navegador do clique, para a Meta atribuir ao anúncio.
+        criptografados (SHA-256), fbc, fbp, IP e navegador do clique, para a Meta atribuir ao anúncio. Leads de formulário nativo vão como
+        eventos de CRM (<code>Lead</code> ao chegar, depois <code>Schedule</code> e <code>Purchase</code>) com o ID do lead da Meta.
       </p>
       {(!serverReady.secret || !serverReady.key) && (
         <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">

@@ -80,6 +80,7 @@ describe("separate panels for gestores", () => {
         if (name === "p_page_id") return page;
         if (type === "boolean") return true;
         if (type === "integer") return 10;
+        if (type === "bigint") return Math.floor(Date.now() / 1000);
         if (type === "text[]") return [];
         return "x";
       });

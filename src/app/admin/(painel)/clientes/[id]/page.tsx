@@ -12,6 +12,7 @@ import { encryptionKey, serverSecret } from "@/lib/server";
 import { AddPageForm, DeleteClient, OwnerForm, PageSettings, ResetPassword } from "./client-actions";
 import { MetaSettings, type MetaSettingsData } from "./meta-settings";
 import { PrivacySettings } from "./privacy-settings";
+import { LeadForms, type LeadFormsData } from "./lead-forms";
 import type { PrivacySettings as PrivacyData } from "@/lib/privacy";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -40,11 +41,12 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
     if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) notFound();
     throw error;
   }
-  const [events, meta, pixels, privacy] = await Promise.all([
+  const [events, meta, pixels, privacy, leadForms] = await Promise.all([
     call<LeadEvent[]>("lh_admin_list_events", { p_token: token, p_workspace_id: id, p_limit: 50 }),
     call<MetaSettingsData>("lh_admin_get_meta", { p_token: token, p_workspace_id: id }),
     call<{ pixel_id: string; last_seen: string }[]>("lh_admin_lp_pixels", { p_token: token, p_workspace_id: id }),
     call<PrivacyData>("lh_admin_get_privacy", { p_token: token, p_workspace_id: id }),
+    call<LeadFormsData>("lh_admin_get_lead_forms", { p_token: token, p_workspace_id: id }),
   ]);
   const origin = await appOrigin();
   const gestores =
@@ -110,6 +112,10 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
 
       <Card title="Privacidade (LGPD)">
         <PrivacySettings workspaceId={client.id} data={privacy} policyUrl={`${origin}/privacidade/${client.slug}`} />
+      </Card>
+
+      <Card title="Formulários nativos da Meta (Lead Ads)">
+        <LeadForms workspaceId={client.id} data={leadForms} serverReady={Boolean(serverSecret()) && Boolean(encryptionKey())} />
       </Card>
 
       <Card title="Conversões para a Meta (API de Conversões)">

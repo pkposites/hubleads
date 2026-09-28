@@ -26,7 +26,12 @@ describe("Meta retries and alerts", () => {
       testCode,
       enabled,
     ]);
-  const pending = () => anon<string[]>(pool, "select lh_server_meta_pending($1, 20) as r", [SECRET]);
+  // Only this test's client: other test files may leave their own leads pending.
+  const pending = async () => {
+    const ids = await anon<string[]>(pool, "select lh_server_meta_pending($1, 100) as r", [SECRET]);
+    const mine = await pool.query("select id from lh_leads where workspace_id = $1 and id = any($2::uuid[])", [ws.workspaceId, ids]);
+    return ids.filter((id) => mine.rows.some((r) => r.id === id));
+  };
   const log = (lead: string, event: string, ok: boolean, test = false) =>
     anon(pool, "select lh_server_meta_log($1, $2, $3, $4, 'id', $5, $6, 'resp') as r", [SECRET, ws.workspaceId, lead, event, ok, test]);
   const lead = async (visitor: string, patch: Record<string, unknown>) => {

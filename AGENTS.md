@@ -27,6 +27,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - `/api/collect` calls only `lh_server_collect` / `lh_server_count_visit`
   (server secret + sending limits per device); `lh_collect` and
   `lh_count_visit` live in `lh_private` and are not callable from the API.
+- Meta native forms: `lh_meta_lead_forms` + `lh_meta_lead_access` (encrypted
+  system user token); the minute job is `src/lib/meta-lead-sync.ts`. Form leads
+  (`source = 'meta_form'`) go back to Meta as CRM events with `lead_id`
+  (`src/lib/meta.ts`). `LH_META_GRAPH_URL` exists only for end-to-end tests.
 - Never log names, phones, codes or raw payloads.
 - Secrets saved in the database (the Meta token) are encrypted by the app with
   `encryptSecret` (`src/lib/crypto.ts`, key `LH_ENCRYPTION_KEY`); the database

@@ -146,6 +146,25 @@ teste, os eventos aparecem só em "Testar eventos" do Gerenciador de Eventos.
 A versão da Graph API pode ser trocada com `META_GRAPH_VERSION` (padrão
 `v24.0`).
 
+## Formulários nativos da Meta (Lead Ads)
+
+No painel mãe, na página do cliente, o cartão **Formulários nativos da Meta**
+recebe o token de um usuário do sistema do Gerenciador de Negócios (com
+`leads_retrieval`, `pages_show_list`, `pages_read_engagement`,
+`pages_manage_ads` e `ads_management`, e a Página atribuída a ele). O token é
+conferido com a Meta e guardado criptografado. Em **Adicionar formulário**
+aparecem as Páginas e formulários que o token enxerga; ao conectar, escolhe-se
+trazer só os leads novos ou também os últimos 1, 7, 30 ou 90 dias.
+
+A cada minuto (`netlify/functions/meta-leads.mts` → `/api/cron/meta-leads`) o
+app busca os leads novos de cada formulário ativo e cria a linha na planilha
+(origem Meta Ads, campanha, conjunto, anúncio, respostas e o formulário),
+avisa os atendentes e manda à Meta o evento de CRM `Lead`. Depois, Agendado e
+Venda vão como `Schedule` e `Purchase` no formato de CRM (com o `lead_id`),
+usando o conjunto de dados do cartão da API de Conversões. O mesmo lead da
+Meta nunca entra duas vezes; erros (token vencido, sem permissão) aparecem no
+cartão.
+
 ## Métricas
 
 A aba **Métricas** (visível para o atendente e para o administrador) mostra a
