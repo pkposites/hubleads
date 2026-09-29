@@ -38,11 +38,16 @@ export function GoogleAds({ workspaceId, data, origin }: { workspaceId: string; 
     });
 
   const intro = (
-    <p className="text-zinc-600">
-      Leva para o Google Ads os leads que vieram de um anúncio do Google (com o código de clique <em>gclid</em>): <strong>Lead</strong> quando o
-      lead chega, <strong>Agendamento</strong> e <strong>Venda</strong> com o valor. Assim o Google aprende quais cliques viram cliente. Funciona
-      por um arquivo que o próprio Google Ads busca todo dia, protegido por usuário e senha; não precisa de acesso à API do Google.
-    </p>
+    <div className="flex flex-col gap-1 text-zinc-700">
+      <p>
+        <strong>Para que serve:</strong> quando alguém que clicou num anúncio do Google vira lead, agenda ou compra, o Lead Hub conta isso para o
+        Google Ads. Assim o Google aprende quem vira cliente e passa a mostrar o anúncio para pessoas parecidas.
+      </p>
+      <p className="text-zinc-600">
+        Você configura uma vez só, no Google Ads do cliente (uns 10 minutos, mais uma espera de 6 horas que o Google exige). Depois disso o
+        Google busca as novidades aqui sozinho, todo dia.
+      </p>
+    </div>
   );
 
   if (!data) {
@@ -53,7 +58,12 @@ export function GoogleAds({ workspaceId, data, origin }: { workspaceId: string; 
         <Button className="self-start" disabled={busy} onClick={generate}>
           {busy ? "Gerando..." : "Ativar retorno para o Google Ads"}
         </Button>
-        {access && <AccessBox access={access} names={names} />}
+        {access && (
+          <>
+            <AccessBox access={access} />
+            <Guide names={names} open />
+          </>
+        )}
       </div>
     );
   }
@@ -76,9 +86,9 @@ export function GoogleAds({ workspaceId, data, origin }: { workspaceId: string; 
       <div className="grid gap-3 sm:grid-cols-3">
         {(
           [
-            ["lead_name", "send_lead", "Lead (chegou)"],
+            ["lead_name", "send_lead", "Lead (chegou um contato)"],
             ["schedule_name", "send_schedule", "Agendamento"],
-            ["purchase_name", "send_purchase", "Venda (com valor)"],
+            ["purchase_name", "send_purchase", "Venda (vai com o valor)"],
           ] as const
         ).map(([nameKey, sendKey, label]) => (
           <div key={nameKey} className="flex flex-col gap-1 rounded-md border border-zinc-200 p-2">
@@ -98,9 +108,8 @@ export function GoogleAds({ workspaceId, data, origin }: { workspaceId: string; 
         ))}
       </div>
       <p className="text-xs text-zinc-500">
-        Os nomes precisam ser idênticos aos das conversões criadas no Google Ads (maiúsculas, espaços e traços). Uma venda que não passou por
-        Agendado também conta como Agendamento, para a campanha não perder esse sinal. Entram as conversões dos últimos 30 dias de leads com
-        clique do Google dos últimos 90 dias; o Google ignora as que já recebeu.
+        O nome de cada conversão aqui tem que ser <strong>igual</strong> ao que você criar no Google Ads (mesmas letras, espaços e traços).
+        Desmarque o que não quiser mandar.
       </p>
 
       {error && <p className="text-red-700">{error}</p>}
@@ -127,26 +136,35 @@ export function GoogleAds({ workspaceId, data, origin }: { workspaceId: string; 
       </div>
 
       {access ? (
-        <AccessBox access={access} names={names} />
+        <AccessBox access={access} />
       ) : (
-        <p className="text-xs text-zinc-500">
-          Endereço do arquivo: <code className="font-mono">{`${origin}/api/google-ads/${data.feed_id}`}</code> · usuário{" "}
-          <code className="font-mono">{data.username}</code> · a senha só aparece quando é gerada (use &quot;Nova senha&quot; se perdeu; a antiga
-          para de funcionar).
-        </p>
+        <div className="flex flex-col gap-1 rounded-md bg-zinc-50 p-3 text-xs text-zinc-600">
+          <span className="font-medium text-zinc-800">Dados para colar no Google Ads</span>
+          <span>
+            Endereço: <code className="break-all font-mono">{`${origin}/api/google-ads/${data.feed_id}`}</code>
+          </span>
+          <span>
+            Usuário: <code className="font-mono">{data.username}</code>
+          </span>
+          <span>
+            Senha: por segurança, só aparece na hora em que é criada. Se perdeu, clique em &quot;Nova senha&quot; (a antiga para de funcionar e
+            você atualiza no Google Ads).
+          </span>
+        </div>
       )}
+      <Guide names={names} open={Boolean(access) || !data.last_fetch_at} />
     </div>
   );
 }
 
-function AccessBox({ access, names }: { access: Access; names: { lead_name: string; schedule_name: string; purchase_name: string } }) {
+function AccessBox({ access }: { access: Access }) {
   return (
     <div className="flex flex-col gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-950">
-      <p className="font-medium">Anote agora: a senha não aparece de novo.</p>
+      <p className="font-medium">Guarde estes dados agora: a senha não aparece de novo. Você vai colar os três no Google Ads (Parte 2 abaixo).</p>
       <dl className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1.5">
         {(
           [
-            ["Endereço (URL)", access.url],
+            ["Endereço", access.url],
             ["Usuário", access.username],
             ["Senha", access.password],
           ] as const
@@ -158,29 +176,75 @@ function AccessBox({ access, names }: { access: Access; names: { lead_name: stri
           </div>
         ))}
       </dl>
-      <ol className="mt-1 list-decimal space-y-1 pl-5">
-        <li>
-          No Google Ads do cliente: <strong>Metas → Conversões → Resumo → + Nova ação de conversão → Importar →</strong> &quot;Outras fontes de dados
-          ou CRMs&quot; → <strong>Rastrear conversões de cliques</strong>.
-        </li>
-        <li>
-          Crie uma conversão para cada nome, exatamente assim: <strong>{names.lead_name}</strong>, <strong>{names.schedule_name}</strong> e{" "}
-          <strong>{names.purchase_name}</strong>. Na venda, escolha &quot;Usar valores diferentes para cada conversão&quot;. Deixe como meta principal
-          só a que a campanha deve otimizar (em geral Agendamento ou Venda).
-        </li>
-        <li>
-          Espere cerca de 6 horas (o Google exige esse tempo depois de criar as conversões) e vá em{" "}
-          <strong>Metas → Conversões → Uploads → Programações → + (nova programação)</strong>.
-        </li>
-        <li>
-          Fonte: <strong>HTTPS</strong>. Cole o endereço, o usuário e a senha acima. Frequência: <strong>todos os dias</strong>. Salve.
-        </li>
-        <li>No mesmo lugar, &quot;Visualizar uploads&quot; mostra o resultado de cada busca. Aqui no Lead Hub aparece a data da última busca.</li>
-      </ol>
-      <p className="text-xs">
-        Para ter o clique do Google nos leads, o anúncio precisa da <strong>codificação automática (gclid)</strong> ligada na conta do Google Ads
-        (vem ligada por padrão) e a LP precisa do código do Lead Hub instalado.
-      </p>
     </div>
+  );
+}
+
+/** The step-by-step in Google Ads, in plain words. */
+function Guide({ names, open }: { names: { lead_name: string; schedule_name: string; purchase_name: string }; open: boolean }) {
+  const name = (text: string) => <code className="rounded bg-white px-1 py-0.5 font-mono text-[13px] text-zinc-900 ring-1 ring-zinc-200">{text}</code>;
+  return (
+    <details open={open} className="rounded-md border border-zinc-200 p-3">
+      <summary className="cursor-pointer font-medium">Como configurar no Google Ads (passo a passo)</summary>
+      <div className="mt-3 flex flex-col gap-4 text-zinc-700">
+        <section>
+          <h4 className="font-semibold text-zinc-900">Parte 1: criar as 3 conversões (uma vez só)</h4>
+          <ol className="mt-1 list-decimal space-y-1.5 pl-5">
+            <li>
+              Entre no Google Ads do cliente. No menu da esquerda, clique em <strong>Metas</strong> e depois em <strong>Conversões</strong>.
+            </li>
+            <li>
+              Clique no botão azul <strong>+ Criar ação de conversão</strong>.
+            </li>
+            <li>
+              Escolha <strong>Importar</strong>, depois <strong>Outras fontes de dados ou CRMs</strong> e depois <strong>Rastrear conversões de
+              cliques</strong>. Clique em Continuar.
+            </li>
+            <li>
+              No nome, escreva exatamente {name(names.lead_name)} e salve. Faça de novo para {name(names.schedule_name)} e para{" "}
+              {name(names.purchase_name)}. Na Venda, em &quot;Valor&quot;, escolha <strong>Usar valores diferentes para cada conversão</strong>.
+            </li>
+            <li>
+              Deixe como <strong>meta principal</strong> só a conversão que você quer que o Google busque mais (em geral Agendamento ou Venda). As
+              outras ficam como <strong>secundárias</strong>, só para você acompanhar. Assim o mesmo cliente não é contado duas vezes.
+            </li>
+          </ol>
+        </section>
+        <section>
+          <h4 className="font-semibold text-zinc-900">Parte 2: ligar o envio automático (6 horas depois da Parte 1)</h4>
+          <p className="text-xs text-zinc-500">O Google só aceita receber dados 6 horas depois que as conversões são criadas.</p>
+          <ol className="mt-1 list-decimal space-y-1.5 pl-5">
+            <li>
+              Em <strong>Metas → Conversões</strong>, clique em <strong>Uploads</strong>.
+            </li>
+            <li>
+              Clique em <strong>Programações</strong> e depois no botão <strong>+</strong>.
+            </li>
+            <li>
+              Em &quot;Fonte&quot;, escolha <strong>HTTPS</strong>.
+            </li>
+            <li>
+              Cole o <strong>endereço</strong>, o <strong>usuário</strong> e a <strong>senha</strong> do Lead Hub (mostrados acima).
+            </li>
+            <li>
+              Em &quot;Frequência&quot;, escolha <strong>Todos os dias</strong> e salve.
+            </li>
+          </ol>
+        </section>
+        <section className="rounded-md bg-zinc-50 p-2 text-xs text-zinc-600">
+          <p>
+            <strong>Pronto.</strong> Para conferir se está funcionando: aqui no Lead Hub aparece &quot;Última busca do Google&quot;, e no Google Ads,
+            em Uploads, fica o histórico de cada busca.
+          </p>
+          <p className="mt-1">
+            <strong>Só entram leads que clicaram num anúncio do Google.</strong> Para isso, a LP precisa ter o código do Lead Hub instalado e a
+            opção <strong>codificação automática</strong> precisa estar ligada no Google Ads (em Configurações da conta; já vem ligada).
+          </p>
+          <p className="mt-1">
+            Uma venda que pulou o &quot;Agendado&quot; também conta como Agendamento, para o Google não perder esse cliente.
+          </p>
+        </section>
+      </div>
+    </details>
   );
 }
