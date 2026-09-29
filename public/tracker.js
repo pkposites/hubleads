@@ -183,6 +183,15 @@
     var result = {};
     for (var k in attr) if (k !== "saved_at" && k !== "url_params" && attr[k] != null) result[k] = attr[k];
     urlParams = attr.url_params || {};
+    // The Google tag keeps the ad click in a cookie ("GCL.<time>.<gclid>"):
+    // used when the address lost it, and only when nothing says the visit
+    // came from somewhere else.
+    var otherSource = result.fbclid || result.ttclid || result.msclkid || result.gbraid || result.wbraid ||
+      (result.utm_source && !/google/i.test(result.utm_source));
+    if (!result.gclid && !otherSource) {
+      var gcl = (cookie("_gcl_aw") || "").split(".");
+      if (gcl.length >= 3 && gcl[2]) result.gclid = gcl.slice(2).join(".").slice(0, 500);
+    }
     result.fbp = cookie("_fbp") || undefined;
     result.fbc =
       cookie("_fbc") ||

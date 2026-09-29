@@ -14,6 +14,8 @@ import { MetaSettings, type MetaSettingsData } from "./meta-settings";
 import { PrivacySettings } from "./privacy-settings";
 import { LeadForms, type LeadFormsData } from "./lead-forms";
 import { SheetSources, type SheetSource } from "./sheet-sources";
+import { GoogleAds } from "./google-ads";
+import type { GoogleAdsSettings } from "@/lib/google-ads";
 import type { PrivacySettings as PrivacyData } from "@/lib/privacy";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -42,13 +44,14 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
     if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) notFound();
     throw error;
   }
-  const [events, meta, pixels, privacy, leadForms, sources] = await Promise.all([
+  const [events, meta, pixels, privacy, leadForms, sources, googleAds] = await Promise.all([
     call<LeadEvent[]>("lh_admin_list_events", { p_token: token, p_workspace_id: id, p_limit: 50 }),
     call<MetaSettingsData>("lh_admin_get_meta", { p_token: token, p_workspace_id: id }),
     call<{ pixel_id: string; last_seen: string }[]>("lh_admin_lp_pixels", { p_token: token, p_workspace_id: id }),
     call<PrivacyData>("lh_admin_get_privacy", { p_token: token, p_workspace_id: id }),
     call<LeadFormsData>("lh_admin_get_lead_forms", { p_token: token, p_workspace_id: id }),
     call<SheetSource[]>("lh_admin_list_sources", { p_token: token, p_workspace_id: id }),
+    call<GoogleAdsSettings | null>("lh_admin_get_google_ads", { p_token: token, p_workspace_id: id }),
   ]);
   const origin = await appOrigin();
   const gestores =
@@ -130,12 +133,16 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
       </Card>
 
       <div className="mt-2">
-        <h2 className="text-base font-semibold">Retorno para a Meta e configurações</h2>
-        <p className="text-sm text-zinc-600">Agendado e Venda voltam para a Meta; privacidade e eventos das LPs.</p>
+        <h2 className="text-base font-semibold">Retorno para Meta e Google Ads, e configurações</h2>
+        <p className="text-sm text-zinc-600">Lead, Agendado e Venda voltam para as plataformas de anúncio; privacidade e eventos das LPs.</p>
       </div>
 
       <Card title="Conversões para a Meta (API de Conversões)">
         <MetaSettings workspaceId={client.id} data={meta} pixels={pixels.map((p) => p.pixel_id)} serverReady={{ secret: Boolean(serverSecret()), key: Boolean(encryptionKey()) }} />
+      </Card>
+
+      <Card title="Conversões para o Google Ads">
+        <GoogleAds workspaceId={client.id} data={googleAds} origin={origin} />
       </Card>
 
       <Card title="Privacidade (LGPD)">

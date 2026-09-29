@@ -83,6 +83,7 @@ describe("separate panels for gestores", () => {
         if (type === "bigint") return Math.floor(Date.now() / 1000);
         if (type === "uuid") return "00000000-0000-4000-8000-000000000000";
         if (type === "text[]") return [];
+        if (type === "jsonb") return "{}";
         return "x";
       });
       const placeholders = values.map((_, i) => `$${i + 1}`).join(", ");

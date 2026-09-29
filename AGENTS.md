@@ -34,6 +34,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   system user token); the minute job is `src/lib/meta-lead-sync.ts`. Form leads
   (`source = 'meta_form'`) go back to Meta as CRM events with `lead_id`
   (`src/lib/meta.ts`). `LH_META_GRAPH_URL` exists only for end-to-end tests.
+- Google Ads: offline conversion import by scheduled file. Google Ads fetches
+  `/api/google-ads/<feed id>` (HTTP Basic, `lh_google_ads`, password hash only);
+  `lh_server_google_ads_feed` lists Lead/Agendamento/Venda of leads with a gclid.
 - Never log names, phones, codes or raw payloads.
 - Secrets saved in the database (the Meta token) are encrypted by the app with
   `encryptSecret` (`src/lib/crypto.ts`, key `LH_ENCRYPTION_KEY`); the database

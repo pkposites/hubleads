@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { appOrigin, requireAdmin, ADMIN_COOKIE, type ClientSummary } from "@/lib/admin";
 import { appsScript } from "@/lib/lead-sources";
+import type { GoogleAdsSettings } from "@/lib/google-ads";
 import { clientIp } from "@/lib/collect";
 import { sendTestConversion } from "@/lib/conversions";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
@@ -567,4 +568,40 @@ export async function updateSheetSource(workspaceId: string, sourceId: string, c
   }
   revalidatePath(`/admin/clientes/${workspaceId}`);
   return {};
+}
+
+/** Turns the Google Ads file on, or gives it a new password (shown once). */
+export async function googleAdsCredentials(workspaceId: string): Promise<{ settings?: GoogleAdsSettings; url?: string; error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    const settings = await call<GoogleAdsSettings>("lh_admin_google_ads_credentials", { p_token: token, p_workspace_id: workspaceId });
+    revalidatePath(`/admin/clientes/${workspaceId}`);
+    return { settings, url: `${await appOrigin()}/api/google-ads/${settings.feed_id}` };
+  } catch {
+    return { error: "Não foi possível gerar o acesso." };
+  }
+}
+
+export async function updateGoogleAds(
+  workspaceId: string,
+  change: Partial<Pick<GoogleAdsSettings, "enabled" | "lead_name" | "schedule_name" | "purchase_name" | "send_lead" | "send_schedule" | "send_purchase">> & {
+    remove?: boolean;
+  },
+): Promise<{ error?: string }> {
+  const { token } = await requireAdmin();
+  const { remove, ...settings } = change;
+  for (const key of ["lead_name", "schedule_name", "purchase_name"] as const) {
+    if (key in settings) {
+      const name = String(settings[key] ?? "").trim().slice(0, 100);
+      if (!name) return { error: "Dê um nome para cada conversão." };
+      settings[key] = name;
+    }
+  }
+  try {
+    await call("lh_admin_update_google_ads", { p_token: token, p_workspace_id: workspaceId, p_settings: settings, p_delete: Boolean(remove) });
+    revalidatePath(`/admin/clientes/${workspaceId}`);
+    return {};
+  } catch {
+    return { error: "Não foi possível salvar." };
+  }
 }

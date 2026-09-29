@@ -109,6 +109,20 @@ describe("tracker.js", () => {
     expect(sent[0].attribution).toMatchObject({ utm_source: "google", gclid: "abc" });
   });
 
+  it("takes the Google ad click from the Google tag cookie when the address lost it", async () => {
+    document.cookie = "_gcl_aw=GCL.1727180000.CjwKCAjwTESTgclid";
+    const { sent, flush } = load("/lp?utm_source=google&utm_medium=cpc");
+    await flush();
+    expect(sent[0].attribution).toMatchObject({ utm_source: "google", gclid: "CjwKCAjwTESTgclid" });
+
+    // A visit from a Meta ad keeps its own source.
+    localStorage.clear();
+    const meta = load("/lp?utm_source=facebook&fbclid=IwAR7");
+    await meta.flush();
+    expect(meta.sent[0].attribution.gclid).toBeUndefined();
+    document.cookie = "_gcl_aw=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  });
+
   it("records a WhatsApp click and adds the code to the message", async () => {
     const { sent, flush } = load("/?utm_campaign=sp");
     const a = whatsappLink("https://wa.me/5511999999999?text=Quero%20agendar");

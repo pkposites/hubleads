@@ -173,6 +173,24 @@ teste, os eventos aparecem só em "Testar eventos" do Gerenciador de Eventos.
 A versão da Graph API pode ser trocada com `META_GRAPH_VERSION` (padrão
 `v24.0`).
 
+## Conversões para o Google Ads
+
+Importação de conversões offline por arquivo programado, sem acesso à API do
+Google. No painel mãe, cliente → **Conversões para o Google Ads → Ativar**:
+aparecem o endereço (`/api/google-ads/<id>`), o usuário e a senha (mostrada uma
+vez, guardada só como hash). No Google Ads do cliente, crie conversões do tipo
+"Importar → conversões de cliques" com os mesmos nomes (padrão `Lead Hub - Lead`,
+`Lead Hub - Agendamento`, `Lead Hub - Venda`) e, em **Conversões → Uploads →
+Programações**, uma programação diária por HTTPS com esse endereço, usuário e
+senha.
+
+O arquivo segue o modelo do Google (`Parameters:TimeZone=America/Sao_Paulo`,
+`Google Click ID, Conversion Name, Conversion Time, Conversion Value, Conversion
+Currency`) e lista as conversões dos últimos 30 dias dos leads com `gclid` dos
+últimos 90 dias: Lead na chegada, Agendamento na primeira vez em Agendado (ou
+Venda) e Venda com o valor. O Google ignora as que já recebeu. O `tracker.js` lê
+o `gclid` do endereço e, se ele se perdeu, do cookie `_gcl_aw` da tag do Google.
+
 ## Formulários nativos da Meta (Lead Ads)
 
 No painel mãe, na página do cliente, o cartão **Formulários nativos da Meta**
