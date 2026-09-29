@@ -141,7 +141,7 @@ export function GoogleAds({ workspaceId, data, origin }: { workspaceId: string; 
         <div className="flex flex-col gap-1 rounded-md bg-zinc-50 p-3 text-xs text-zinc-600">
           <span className="font-medium text-zinc-800">Dados para colar no Google Ads</span>
           <span>
-            Endereço: <code className="break-all font-mono">{`${origin}/api/google-ads/${data.feed_id}`}</code>
+            Endereço: <code className="break-all font-mono">{`${origin}/api/google-ads/${data.feed_id}.csv`}</code>
           </span>
           <span>
             Usuário: <code className="font-mono">{data.username}</code>
@@ -215,19 +215,20 @@ function Guide({ names, open }: { names: { lead_name: string; schedule_name: str
           <p className="text-xs text-zinc-500">O Google só aceita receber dados 6 horas depois que as conversões são criadas.</p>
           <ol className="mt-1 list-decimal space-y-1.5 pl-5">
             <li>
-              Em <strong>Metas → Conversões</strong>, clique em <strong>Uploads</strong>.
+              Em <strong>Metas → Conversões</strong>, clique em <strong>Uploads</strong>, depois em <strong>Programações</strong> e no botão{" "}
+              <strong>+</strong>. Escolha a fonte <strong>HTTPS</strong>.
             </li>
             <li>
-              Clique em <strong>Programações</strong> e depois no botão <strong>+</strong>.
+              Abre a tela <strong>Configurar conexão</strong>. Em <strong>Conectar uma origem</strong>, cole o <strong>endereço</strong> (termina em{" "}
+              <code>.csv</code>), o <strong>usuário</strong> e a <strong>senha</strong> do Lead Hub, mostrados acima.
             </li>
             <li>
-              Em &quot;Fonte&quot;, escolha <strong>HTTPS</strong>.
+              Em <strong>Selecionar dados</strong> e <strong>Mapear campos</strong>, as colunas já vêm com os nomes que o Google espera (Google Click
+              ID, Conversion Name, Conversion Time, Conversion Value, Conversion Currency). Se ele pedir para ligar, ligue cada uma ao campo de mesmo
+              nome.
             </li>
             <li>
-              Cole o <strong>endereço</strong>, o <strong>usuário</strong> e a <strong>senha</strong> do Lead Hub (mostrados acima).
-            </li>
-            <li>
-              Em &quot;Frequência&quot;, escolha <strong>Todos os dias</strong> e salve.
+              Em <strong>Análise</strong>, escolha a frequência <strong>Todos os dias</strong> e salve.
             </li>
           </ol>
         </section>

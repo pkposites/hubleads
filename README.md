@@ -177,7 +177,7 @@ A versão da Graph API pode ser trocada com `META_GRAPH_VERSION` (padrão
 
 Importação de conversões offline por arquivo programado, sem acesso à API do
 Google. No painel mãe, cliente → **Conversões para o Google Ads → Ativar**:
-aparecem o endereço (`/api/google-ads/<id>`), o usuário e a senha (mostrada uma
+aparecem o endereço (`/api/google-ads/<id>.csv`), o usuário e a senha (mostrada uma
 vez, guardada só como hash). No Google Ads do cliente, crie conversões do tipo
 "Importar → conversões de cliques" com os mesmos nomes (padrão `Lead Hub - Lead`,
 `Lead Hub - Agendamento`, `Lead Hub - Venda`) e, em **Conversões → Uploads →

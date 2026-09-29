@@ -576,7 +576,7 @@ export async function googleAdsCredentials(workspaceId: string): Promise<{ setti
   try {
     const settings = await call<GoogleAdsSettings>("lh_admin_google_ads_credentials", { p_token: token, p_workspace_id: workspaceId });
     revalidatePath(`/admin/clientes/${workspaceId}`);
-    return { settings, url: `${await appOrigin()}/api/google-ads/${settings.feed_id}` };
+    return { settings, url: `${await appOrigin()}/api/google-ads/${settings.feed_id}.csv` };
   } catch {
     return { error: "Não foi possível gerar o acesso." };
   }
