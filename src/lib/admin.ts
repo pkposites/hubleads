@@ -75,7 +75,7 @@ export function installPrompt(origin: string, page: Pick<Page, "public_key">) {
   const policy = `${origin}/privacidade/${page.public_key}`;
   return `Quero conectar esta landing page ao Lead Hub, que registra cada contato pelo WhatsApp numa planilha com a origem do anúncio, respeitando a LGPD.
 
-1. Adicione este script em todas as páginas, dentro do <head>, logo depois do pixel da Meta. Não altere os scripts atuais de UTMs e eventos:
+1. Adicione este script em todas as páginas, dentro do <head>, logo depois do pixel da Meta (sem pixel: logo depois da tag do Google/GTM; sem nenhum dos dois: no início do <head>). Não altere os scripts atuais de UTMs e eventos:
 
 ${snippet(origin, page)}
 
@@ -101,7 +101,9 @@ ${snippet(origin, page)}
    Use rótulos curtos em português como chave (viram colunas na planilha) e o texto da opção como valor.
    Se alguma pergunta for sobre saúde (sintomas, tratamentos, condições), inclua antes do envio uma caixa de seleção, desmarcada, obrigatória para enviar essas respostas: "Autorizo o uso das minhas respostas sobre saúde somente para o meu atendimento." Sem a marcação, não chame LeadHub.set com essas respostas.
 
-6. Não mexa na Conversions API. No final, liste os botões alterados, como cada um abre o WhatsApp e onde ficou o link da política.
+6. Anúncios (Meta e Google Ads): não remova nem reescreva os parâmetros do endereço (utm_*, fbclid, gclid, gbraid, wbraid). Se a página redireciona (www, http→https, outra rota, página de obrigado), mantenha tudo o que vem depois do "?". Se a página já tem a tag do Google (gtag ou GTM), mantenha-a como está: o Lead Hub também lê dela o clique do anúncio do Google.
 
-Para testar: abra a página com ?utm_source=teste, aceite os cookies, preencha nome e telefone e clique no WhatsApp. A mensagem deve terminar com "(cód. XXXX)" e o contato aparece na planilha do Lead Hub. Em outra janela anônima, recuse os cookies: o contato ainda aparece, mas com a origem "não coletada".`;
+7. Não mexa na Conversions API. No final, liste os botões alterados, como cada um abre o WhatsApp, onde ficou o link da política e se a página tem algum redirecionamento (e se ele mantém os parâmetros).
+
+Para testar: abra a página com ?utm_source=teste, aceite os cookies, preencha nome e telefone e clique no WhatsApp. A mensagem deve terminar com "(cód. XXXX)" e o contato aparece na planilha do Lead Hub. Em outra janela anônima, recuse os cookies: o contato ainda aparece, mas com a origem "não coletada". Se o cliente anuncia no Google, teste também com ?gclid=teste-leadhub: o contato deve aparecer com a origem "Google Ads" (depois apague esse contato de teste na planilha).`;
 }
