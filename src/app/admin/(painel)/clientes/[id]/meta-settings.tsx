@@ -13,6 +13,10 @@ export interface MetaSettingsData {
   enabled: boolean;
   send_schedule: boolean;
   send_purchase: boolean;
+  /** Visitors who did not accept cookies still count for Meta (page view and lead). */
+  minimal_tracking: boolean;
+  minimal_views_today: number;
+  minimal_leads_7d: number;
   recent: { event: string; ok: boolean; test: boolean; at: string; response: string | null }[];
   failures_24h: number;
   last_error: string | null;
@@ -118,6 +122,19 @@ export function MetaSettings({
           </label>
           <label className="flex items-center gap-2">
             <input type="checkbox" name="send_purchase" defaultChecked={data.send_purchase} /> Venda com valor → Purchase
+          </label>
+          <label className="flex items-start gap-2">
+            <input type="checkbox" name="minimal_tracking" defaultChecked={data.minimal_tracking} className="mt-1" />
+            <span>
+              Medição sem cookies para quem não aceitou o aviso da LP
+              <span className="block text-xs text-zinc-500">
+                Quem recusa ou ignora o aviso de cookies ainda conta para a Meta: a visita (<code>PageView</code>), o clique no WhatsApp (
+                <code>Lead</code>) e depois Agendado/Venda. Vai só o identificador do clique no anúncio (lido do endereço, sem cookie), IP e
+                navegador: sem nome, telefone nem nada guardado no aparelho da pessoa.
+                {data.configured &&
+                  ` Hoje: ${data.minimal_views_today} ${data.minimal_views_today === 1 ? "visita enviada" : "visitas enviadas"}; últimos 7 dias: ${data.minimal_leads_7d} ${data.minimal_leads_7d === 1 ? "evento de lead" : "eventos de lead"} sem cookies.`}
+              </span>
+            </span>
           </label>
         </div>
         {dirty && !pending ? (

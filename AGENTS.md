@@ -34,6 +34,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   system user token); the minute job is `src/lib/meta-lead-sync.ts`. Form leads
   (`source = 'meta_form'`) go back to Meta as CRM events with `lead_id`
   (`src/lib/meta.ts`). `LH_META_GRAPH_URL` exists only for end-to-end tests.
+- Measurement without cookies (`lh_meta_configs.minimal_tracking`, default on):
+  visitors who did not accept the LP banner still reach Meta from the server
+  (`meta_view` → PageView, never stored; their Lead/Schedule/Purchase) with only
+  fbc from the URL, IP and browser (`minimalUserData` in `src/lib/meta.ts`).
 - Google Ads: offline conversion import by scheduled file. Google Ads fetches
   `/api/google-ads/<feed id>` (HTTP Basic, `lh_google_ads`, password hash only);
   `lh_server_google_ads_feed` lists Lead/Agendamento/Venda of leads with a gclid.

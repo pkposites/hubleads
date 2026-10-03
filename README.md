@@ -83,8 +83,11 @@ Segurança e LGPD (feito e pendente): [docs/SEGURANCA-LGPD.md](docs/SEGURANCA-LG
 
 ## LGPD
 
-- Código da LP com `data-consent="banner"`: aviso de cookies (Aceitar/Recusar);
-  sem aceite, nada fica no aparelho e só o contato digitado é registrado.
+- Código da LP com `data-consent="banner"`: aviso de cookies (Aceitar / Recusar
+  cookies); sem aceite, nada fica no aparelho e só o contato digitado é
+  registrado. Com a medição sem cookies ligada (padrão quando a Meta está
+  configurada), a visita e o clique ainda vão à Meta pelo servidor, só com
+  fbc lido do endereço, IP e navegador (`type: "meta_view"` no `/api/collect`).
 - Política de privacidade pública por cliente em `/privacidade/<cliente>`,
   preenchida no painel mãe (cartão Privacidade).
 - Prazo de guarda automático (função agendada `netlify/functions/retention.mts`),
@@ -160,7 +163,9 @@ os 4 últimos caracteres. Com o envio ligado:
 Cada evento vai uma vez por lead (`event_id` = lead + evento), com telefone e
 nome em SHA-256, `fbc`, `fbp`, IP e navegador do clique, no horário em que o
 lead foi agendado ou vendido e como conversão feita na conversa
-(`action_source: chat`). Quem recusou os cookies na LP não é enviado.
+(`action_source: chat`). Quem não aceitou os cookies na LP vai só com a medição
+sem cookies (o `Lead` do clique também, já que o pixel da LP ficou parado):
+`fbc` do endereço, IP e navegador, sem telefone nem nome.
 
 Se um envio falhar, a função agendada `netlify/functions/meta-retry.mts` tenta
 de novo a cada hora (até 6 vezes por evento, enquanto o resultado tiver menos

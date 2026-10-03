@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { dueEvents, normalizeMetaPhone, normalizeName, sendMetaEvent, sha256, type MetaConfig, type MetaLead } from "@/lib/meta";
+import { dueEvents, minimalPageView, normalizeMetaPhone, normalizeName, sendMetaEvent, sha256, type MetaConfig, type MetaLead } from "@/lib/meta";
 
 const config: MetaConfig = {
   pixel_id: "123456789",
@@ -65,9 +65,33 @@ describe("Meta conversions", () => {
     expect(dueEvents(lead({ status: "perdido", sale_value: 10 }), config, [])).toEqual([]);
   });
 
-  it("sends nothing for visitors who refused tracking", () => {
+  it("sends nothing for visitors who refused tracking when the measurement without cookies is off", () => {
     expect(dueEvents(lead({ tracking_consent: false }), config, [])).toEqual([]);
+    expect(dueEvents(lead({ tracking_consent: false }), { ...config, minimal_tracking: false }, [])).toEqual([]);
     expect(dueEvents(lead({ tracking_consent: true }), config, [])).toHaveLength(1);
+  });
+
+  it("sends the minimum for visitors without cookies: Lead from the page, then Schedule, without contact or ids", () => {
+    const now = new Date("2026-10-03T12:00:00Z");
+    const minimalConfig = { ...config, minimal_tracking: true };
+    const fresh = lead({ tracking_consent: false, status: "novo", created_at: "2026-10-03T11:00:00Z" });
+    const [leadEvent] = dueEvents(fresh, minimalConfig, [], now);
+    expect(leadEvent).toEqual({
+      event_name: "Lead",
+      event_time: Date.parse("2026-10-03T11:00:00Z") / 1000,
+      event_id: "lead-1.Lead",
+      action_source: "website",
+      event_source_url: "https://clinica.com.br/lp",
+      user_data: { client_ip_address: "200.100.50.25", client_user_agent: "Mozilla/5.0 (iPhone)", fbc: "fb.1.1.IwAR" },
+    });
+    expect(dueEvents(fresh, minimalConfig, ["Lead"], now)).toEqual([]);
+
+    const booked = dueEvents(lead({ tracking_consent: false, created_at: "2026-10-03T11:00:00Z" }), minimalConfig, ["Lead"], now);
+    expect(booked).toHaveLength(1);
+    expect(booked[0]).toMatchObject({ event_name: "Schedule", action_source: "chat" });
+    expect(Object.keys(booked[0].user_data).sort()).toEqual(["client_ip_address", "client_user_agent", "fbc"]);
+    // Visitors who accepted: the page's pixel sends the Lead, not Lead Hub.
+    expect(dueEvents(lead({ tracking_consent: true, status: "novo", created_at: "2026-10-03T11:00:00Z" }), minimalConfig, [], now)).toEqual([]);
   });
 
   it("uses the time the lead was booked, and stops after 7 days", () => {
@@ -93,5 +117,16 @@ describe("Meta conversions", () => {
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toMatch(/^https:\/\/graph\.facebook\.com\/v\d+\.\d+\/123456789\/events$/);
     expect(JSON.parse(String(init.body))).toMatchObject({ test_event_code: "TEST1", access_token: "EAAsecret", data: [{ event_name: "Schedule" }] });
+  });
+
+  it("builds the page view without cookies", () => {
+    expect(minimalPageView({ fbc: "fb.1.2.IwAR", url: "https://x.com/lp", ip: "1.2.3.4", userAgent: "UA" }, "pv.1", new Date(5000))).toEqual({
+      event_name: "PageView",
+      event_time: 5,
+      event_id: "pv.1",
+      action_source: "website",
+      event_source_url: "https://x.com/lp",
+      user_data: { client_ip_address: "1.2.3.4", client_user_agent: "UA", fbc: "fb.1.2.IwAR" },
+    });
   });
 });

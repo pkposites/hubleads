@@ -256,6 +256,11 @@ export async function saveMetaSettings(workspaceId: string, _prev: AdminFormStat
       p_send_schedule: formData.get("send_schedule") === "on",
       p_send_purchase: formData.get("send_purchase") === "on",
     });
+    await call("lh_admin_set_meta_minimal", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_enabled: formData.get("minimal_tracking") === "on",
+    });
   } catch (error) {
     if (error instanceof DbError && error.code === "22023") return { error: "Informe o token de acesso." };
     return { error: "Não foi possível salvar." };

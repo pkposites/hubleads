@@ -90,6 +90,15 @@ export default async function PrivacyPage({ params }: PageProps<"/privacidade/[r
             <strong>Medir os resultados dos nossos anúncios e melhorar as campanhas</strong>: seu consentimento (art. 7º, I), que pode
             ser retirado a qualquer momento.
           </li>
+          {data.minimal && (
+            <li>
+              <strong>Medição mínima, sem cookies, de quem não aceitou</strong>: para saber se os anúncios trazem visitas e contatos,
+              informamos à Meta que houve uma visita ou um contato vindo de anúncio, com o identificador do clique no anúncio (que vem no
+              endereço da página), o endereço IP e o tipo de navegador. Nada é guardado no seu aparelho e não vão nome, telefone ou
+              respostas. Base legal: nosso legítimo interesse (art. 7º, IX, e art. 10), limitado ao mínimo necessário. Você pode se opor
+              a qualquer momento pelo e-mail indicado nesta política.
+            </li>
+          )}
           <li>
             <strong>Informações de saúde</strong> que você decida contar (por exemplo, num questionário): seu consentimento específico
             e destacado (art. 11, I), usadas somente para o seu atendimento e nunca enviadas a plataformas de anúncios.
@@ -106,9 +115,11 @@ export default async function PrivacyPage({ params }: PageProps<"/privacidade/[r
           <li>Lead Hub, sistema de gestão de contatos que organiza o atendimento (operador).</li>
           <li>Supabase, banco de dados com servidores no Brasil (São Paulo), e Netlify, hospedagem do sistema (Estados Unidos).</li>
           <li>
-            Meta Platforms (Facebook e Instagram), somente com o seu consentimento: dados de navegação para medir anúncios
+            Meta Platforms (Facebook e Instagram): com o seu consentimento, dados de navegação para medir anúncios
             {data.meta &&
               " e, quando você agenda ou compra, o registro desse resultado com telefone e nome em formato criptografado (hash)"}
+            {data.minimal &&
+              "; sem o seu consentimento, apenas a medição mínima sem cookies descrita acima (identificador do clique no anúncio, IP e navegador)"}
             .
           </li>
         </ul>

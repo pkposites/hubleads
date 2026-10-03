@@ -1,7 +1,8 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { decryptSecret } from "@/lib/crypto";
 import { call } from "@/lib/db";
-import { dueEvents, sendMetaEvent, sha256, type MetaConfig, type MetaEvent, type MetaLead } from "@/lib/meta";
+import { dueEvents, minimalPageView, sendMetaEvent, sha256, type MetaConfig, type MetaEvent, type MetaLead } from "@/lib/meta";
 import { encryptionKey, serverSecret } from "@/lib/server";
 
 /** The stored config with its token decrypted, or null when the key is missing or wrong. */
@@ -62,6 +63,30 @@ export async function sendLeadConversions(leadId: string): Promise<{ sent: numbe
     log({ error: (error as { code?: string }).code ?? "unknown" });
   }
   return outcome;
+}
+
+/**
+ * Page view of a visitor without cookies, straight to Meta when the client
+ * keeps the measurement without cookies on. Not stored and not retried.
+ */
+export async function sendMinimalView(
+  key: string,
+  originHost: string | null,
+  view: { fbc?: string; url?: string; ip: string; userAgent: string },
+  client: string,
+): Promise<{ sent?: boolean; limited?: boolean } | null> {
+  const secret = serverSecret();
+  if (!secret) return null;
+  const stored = await call<(Pick<MetaConfig, "pixel_id" | "access_token" | "test_event_code"> & { limited?: boolean }) | null>(
+    "lh_server_meta_view",
+    { p_secret: secret, p_client: client, p_key: key, p_origin_host: originHost },
+  );
+  if (!stored) return null;
+  if (stored.limited) return { limited: true };
+  const config = withPlainToken(stored);
+  if (!config) return null;
+  const result = await sendMetaEvent(config, minimalPageView(view, `pv.${randomUUID()}`));
+  return { sent: result.ok };
 }
 
 /** Hourly: resends what Meta still owes (failures, or bookings made while sending was off). */

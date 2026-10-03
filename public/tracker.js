@@ -28,6 +28,11 @@
  * Until the visitor accepts, nothing is stored on the device and no visitor
  * id or origin is sent with events: a WhatsApp click sends only the contact
  * the person typed.
+ * Measurement without cookies: for visitors who did not accept, Lead Hub's
+ * server can still tell Meta about the page view and the WhatsApp click (when
+ * the client turned it on), with only the ad click id read from the address
+ * (fbclid, never a cookie) and the page address without its parameters. The
+ * page view goes once, when the visitor refuses or leaves the page undecided.
  *
  * Every page load (with or without consent) also sends one anonymous "visit"
  * so the panel counts everyone who saw the page: no identifier and nothing
@@ -77,6 +82,7 @@
   // --- storage (never throws: private mode, blocked storage...) ------------
   // Without consent everything stays in memory, for this page only.
   var memory = {};
+  var LOADED_AT = Date.now();
   function get(name) {
     if (tracking) {
       try {
@@ -214,7 +220,26 @@
       event.url_params = urlParams;
     }
     if (CONSENT_MODE) event.consent = tracking;
+    if (CONSENT_MODE && !tracking && event.type === "whatsapp_click") event.minimal = minimal();
     post(event);
+  }
+
+  // --- measurement without cookies (visitors who did not accept) ----------
+  // Only what the address shows: the page without its parameters and the Meta
+  // ad click id, never a cookie or anything stored on the device.
+  function minimal() {
+    var out = { landing_url: window.location.origin + window.location.pathname };
+    var fbclid = new URLSearchParams(landingUrl().split("?")[1] || "").get("fbclid");
+    if (fbclid && /^[A-Za-z0-9_-]{4,500}$/.test(fbclid)) out.fbc = "fb.1." + LOADED_AT + "." + fbclid;
+    return out;
+  }
+  // Once per page load, when the visitor refused or left the page undecided:
+  // whoever accepts is counted by the page's own Meta pixel instead.
+  var viewSent = false;
+  function minimalView() {
+    if (!CONSENT_MODE || choice === "granted" || viewSent) return;
+    viewSent = true;
+    post({ key: KEY, type: "meta_view", visitor_id: "anonymous", minimal: minimal() });
   }
 
   function post(event) {
@@ -505,6 +530,7 @@
     } catch (e) {}
     if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
     banner = null;
+    if (!granted) minimalView();
     // Pages that start the pixel and Google tags with consent revoked/denied
     // are released (or kept blocked) together with Lead Hub.
     var g = granted ? "granted" : "denied";
@@ -555,7 +581,8 @@
     text.style.cssText = "margin:0 0 10px;";
     text.appendChild(
       document.createTextNode(
-        "Usamos cookies e dados de navegação para medir nossos anúncios e melhorar o atendimento. Você pode aceitar ou recusar. "
+        "Usamos cookies para medir e melhorar nossos anúncios. Se recusar, nada fica guardado no seu aparelho: só contamos, sem cookies, " +
+          "as visitas e os contatos que vêm dos anúncios. "
       )
     );
     var link = document.createElement("a");
@@ -569,7 +596,7 @@
     var row = document.createElement("div");
     row.style.cssText = "display:flex;gap:8px;";
     [
-      ["Recusar", false, "background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);"],
+      ["Recusar cookies", false, "background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);"],
       ["Aceitar", true, "background:#fff;color:#18181b;border:1px solid #fff;"],
     ].forEach(function (b) {
       var button = document.createElement("button");
@@ -598,8 +625,13 @@
 
   function ready() {
     if (tracking) startTracking();
+    else if (choice === "denied") minimalView();
     else showBanner();
   }
+  // Undecided visitors are counted when they leave or switch away from the page.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden" && !choice) minimalView();
+  });
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", ready);
   } else {

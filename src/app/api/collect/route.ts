@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { COLLECT_CORS, handleCollect, handleConfig, type CollectDeps } from "@/lib/collect";
 import { after } from "next/server";
+import { sendLeadConversions, sendMinimalView } from "@/lib/conversions";
 import { call } from "@/lib/db";
 import { notifyNewLead } from "@/lib/push";
 import { serverSecret } from "@/lib/server";
@@ -28,7 +29,12 @@ const deps: CollectDeps = {
   clientKey: (ip) => (ip ? createHmac("sha256", serverSecret() ?? "lead-hub-collect").update(ip).digest("hex").slice(0, 32) : ""),
   pageConfig: (key) => call("lh_page_config", { p_key: key }),
   log: (entry) => console.log(JSON.stringify({ ts: new Date().toISOString(), ...entry })),
-  onNewLead: (leadId) => after(() => notifyNewLead(leadId)),
+  metaView: (key, originHost, view, client) => sendMinimalView(key, originHost, view, client),
+  onNewLead: (leadId, info) =>
+    after(async () => {
+      // Visitors without cookies: the page's pixel stayed off, so the Lead goes from here.
+      await Promise.allSettled([notifyNewLead(leadId), info.consent === false ? sendLeadConversions(leadId) : null]);
+    }),
 };
 
 export function OPTIONS() {

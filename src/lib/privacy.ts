@@ -7,6 +7,8 @@ export interface PublicPrivacy {
   retention_months: number;
   updated_at: string;
   meta: boolean;
+  /** Measurement without cookies on (visitors who did not accept still count for Meta). */
+  minimal?: boolean;
 }
 
 export interface AuditEntry {

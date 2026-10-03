@@ -14,6 +14,8 @@ export interface MetaConfig {
   test_event_code: string | null;
   send_schedule: boolean;
   send_purchase: boolean;
+  /** Visitors who did not accept cookies still go, with the minimum (see minimalUserData). */
+  minimal_tracking?: boolean;
 }
 
 /** The fields of a stored lead row that matter to Meta. */
@@ -76,6 +78,19 @@ export function userData(lead: MetaLead) {
   return data;
 }
 
+/**
+ * user_data of a visitor who did not accept cookies (measurement without
+ * cookies): only the ad click id read from the address, IP and browser. No
+ * name, phone, visitor id or _fbp.
+ */
+export function minimalUserData(lead: MetaLead) {
+  const data: Record<string, unknown> = {};
+  if (lead.ip_address) data.client_ip_address = lead.ip_address;
+  if (lead.user_agent) data.client_user_agent = lead.user_agent;
+  if (lead.fbc) data.fbc = lead.fbc;
+  return data;
+}
+
 /** user_data of a CRM event: the Meta lead id plus hashed phone, e-mail and name. */
 export function crmUserData(lead: MetaLead) {
   const data: Record<string, unknown> = { lead_id: lead.meta_lead_id };
@@ -117,14 +132,18 @@ export function dueEvents(
   statusAt: string | null = null,
 ): MetaEvent[] {
   const events: MetaEvent[] = [];
-  // Nothing about people who refused tracking goes to Meta.
-  if (lead.tracking_consent === false) return events;
+  // People who did not accept cookies go only with the measurement without
+  // cookies, and only when the client keeps it on.
+  const minimal = lead.tracking_consent === false;
+  if (minimal && !config.minimal_tracking) return events;
   const at = statusAt ? new Date(statusAt) : now;
   const statusTooOld = Number.isNaN(at.getTime()) || now.getTime() - at.getTime() > MAX_EVENT_AGE_MS;
   const value = lead.sale_value === null || lead.sale_value === "" ? null : Number(lead.sale_value);
   const wanted: { name: string; custom?: Record<string, unknown>; time?: Date }[] = [];
   const crm = isFormLead(lead);
-  if (crm && !sent.includes("Lead") && lead.created_at) {
+  // Their Lead too: the page's pixel stayed off, so Meta never saw the click.
+  const minimalLead = minimal && !crm && Boolean(lead.ip_address && lead.user_agent);
+  if ((crm || minimalLead) && !sent.includes("Lead") && lead.created_at) {
     // The stage the lead enters with; Meta needs it to learn the funnel.
     const created = new Date(lead.created_at);
     if (!Number.isNaN(created.getTime()) && now.getTime() - created.getTime() <= MAX_EVENT_AGE_MS) wanted.push({ name: "Lead", time: created });
@@ -148,6 +167,22 @@ export function dueEvents(
       });
       continue;
     }
+    if (minimal) {
+      const user = minimalUserData(lead);
+      if (Object.keys(user).length === 0) continue;
+      const website = w.name === "Lead" && /^https?:\/\//.test(lead.landing_url ?? "");
+      events.push({
+        event_name: w.name,
+        event_time: time,
+        event_id: `${lead.id}.${w.name}`,
+        // The click happened on the page; booking and sale in the conversation.
+        action_source: website ? "website" : "chat",
+        ...(website && { event_source_url: lead.landing_url! }),
+        user_data: user,
+        ...(w.custom && { custom_data: w.custom }),
+      });
+      continue;
+    }
     events.push({
       event_name: w.name,
       event_time: time,
@@ -166,6 +201,21 @@ export const graphVersion = () => process.env.META_GRAPH_VERSION || "v24.0";
 
 /** Graph API address; LH_META_GRAPH_URL points it at a fake server in end-to-end tests only. */
 export const graphBase = () => (process.env.LH_META_GRAPH_URL || "https://graph.facebook.com").replace(/\/$/, "");
+
+/**
+ * Page view of a visitor without cookies (sent straight away, never stored):
+ * the page address without parameters, the ad click id, IP and browser.
+ */
+export function minimalPageView(view: { fbc?: string; url?: string; ip: string; userAgent: string }, eventId: string, now = new Date()): MetaEvent {
+  return {
+    event_name: "PageView",
+    event_time: Math.floor(now.getTime() / 1000),
+    event_id: eventId,
+    action_source: "website",
+    ...(view.url && { event_source_url: view.url }),
+    user_data: { client_ip_address: view.ip, client_user_agent: view.userAgent, ...(view.fbc && { fbc: view.fbc }) },
+  };
+}
 
 /** POSTs one event; returns whether Meta accepted it and a short, token-free response. */
 export async function sendMetaEvent(

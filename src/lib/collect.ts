@@ -25,7 +25,25 @@ const eventSchema = z.object({
   data: z.record(z.string(), z.unknown()).optional().nullable(),
   // false: the visitor refused tracking (LGPD); only the typed contact is kept.
   consent: z.boolean().optional().nullable(),
+  // Without consent: the ad click id from the address and the page, for the
+  // measurement without cookies (checked again below).
+  minimal: z.object({ fbc: text(600), landing_url: text(2000) }).optional().nullable(),
 });
+
+const FBC_RE = /^fb\.1\.\d{10,16}\.[A-Za-z0-9_-]{4,500}$/;
+
+/** The measurement without cookies keeps only a valid fbc and the page address without parameters. */
+export function minimalAttribution(minimal: { fbc?: string | null; landing_url?: string | null } | null | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (minimal?.fbc && FBC_RE.test(minimal.fbc)) out.fbc = minimal.fbc;
+  try {
+    const url = new URL(minimal?.landing_url ?? "");
+    if (url.protocol === "https:" || url.protocol === "http:") out.landing_url = `${url.origin}${url.pathname}`.slice(0, 2000);
+  } catch {
+    // no page address
+  }
+  return out;
+}
 
 const ATTRIBUTION_KEYS = [
   "utm_source",
@@ -83,10 +101,20 @@ export interface CollectDeps {
   collect(key: string, originHost: string | null, event: Record<string, unknown>, client: string): Promise<Record<string, unknown>>;
   pageConfig(key: string): Promise<{ whatsapp_code: boolean } | null>;
   log(entry: Record<string, unknown>): void;
-  /** Runs after the response when a click created a new row (notifications). */
-  onNewLead?(leadId: string): void;
+  /** Runs after the response when a click created a new row (notifications; Lead to Meta without cookies). */
+  onNewLead?(leadId: string, info: { consent: boolean | null }): void;
   /** Anonymous visit counter; visitor: hash of IP + browser (once a day per person). */
   countVisit?(key: string, originHost: string | null, visitor: string, dims: VisitDims, client: string): Promise<{ limited?: boolean } | null>;
+  /**
+   * Page view of a visitor without cookies, sent to Meta when the client allows
+   * it. Nothing is stored. sent: whether Meta accepted it.
+   */
+  metaView?(
+    key: string,
+    originHost: string | null,
+    view: { fbc?: string; url?: string; ip: string; userAgent: string },
+    client: string,
+  ): Promise<{ sent?: boolean; limited?: boolean } | null>;
   /** Keyed hash of the visitor's IP; the IP itself is never sent to the database. */
   clientKey(ip: string | undefined): string;
 }
@@ -190,13 +218,16 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
 
   const event = parsed.data;
   if (event.type === "visit") return handleVisit(request, event.key, event.attribution, deps, started);
+  if (event.type === "meta_view") return handleMetaView(request, event.key, event.minimal, deps, started);
   const refused = event.consent === false;
   if (event.type === "lp_event") {
     const name = typeof event.data?.event === "string" ? event.data.event : "";
     // Views, scrolls and the like carry no commercial meaning: not stored.
     if (!name.trim() || isNoiseEvent(name)) return json(200, { ok: true, ignored: true });
   }
-  const attribution: Record<string, string> = {};
+  // Without consent only the measurement without cookies (fbc and the page);
+  // the database drops even that when the client did not turn it on.
+  const attribution: Record<string, string> = refused ? minimalAttribution(event.minimal) : {};
   for (const key of refused ? [] : ATTRIBUTION_KEYS) {
     const value = event.attribution?.[key];
     if (typeof value === "string" && value.trim()) attribution[key] = value.trim().slice(0, 2000);
@@ -222,9 +253,10 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
       device,
       attribution,
       url_params: refused ? {} : cleanAnswers(event.url_params),
-      // Kept for Meta's Conversions API (client_ip_address / client_user_agent).
-      ip_address: refused ? undefined : ip,
-      user_agent: refused ? undefined : request.headers.get("user-agent")?.slice(0, 500) || undefined,
+      // Kept for Meta's Conversions API (client_ip_address / client_user_agent);
+      // without consent the database keeps them only for the measurement without cookies.
+      ip_address: ip,
+      user_agent: request.headers.get("user-agent")?.slice(0, 500) || undefined,
       consent: event.consent ?? undefined,
       data: cleanAnswers(event.data),
     }, deps.clientKey(ip));
@@ -234,13 +266,39 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
     }
     // Logs never carry names, codes or URLs (§15.2).
     deps.log({ route: "POST /api/collect", type: event.type, status: 200, channel, latency_ms: Date.now() - started });
-    if (result.new_lead === true && typeof result.lead_id === "string") deps.onNewLead?.(result.lead_id);
+    if (result.new_lead === true && typeof result.lead_id === "string") deps.onNewLead?.(result.lead_id, { consent: event.consent ?? null });
     return json(200, { ok: true, code: result.code ?? null });
   } catch (error) {
     const code = (error as { code?: string } | null)?.code;
     const status = code === "LH401" ? 401 : code === "LH403" ? 403 : code === "22023" ? 400 : 500;
     deps.log({ route: "POST /api/collect", type: event.type, status, error_code: code ?? "unknown" });
     return json(status, { error: status === 500 ? "internal error" : code });
+  }
+}
+
+/** Page view without cookies: goes to Meta (when the client allows) and is not stored. */
+async function handleMetaView(
+  request: Request,
+  key: string,
+  minimal: { fbc?: string | null; landing_url?: string | null } | null | undefined,
+  deps: CollectDeps,
+  started: number,
+): Promise<Response> {
+  const userAgent = request.headers.get("user-agent");
+  const ip = clientIp(request);
+  if (!deps.metaView || !ip || !userAgent || BOT_RE.test(userAgent)) return json(200, { ok: true, ignored: true });
+  const clean = minimalAttribution(minimal);
+  try {
+    const result = await deps.metaView(key, originHost(request), { fbc: clean.fbc, url: clean.landing_url, ip, userAgent: userAgent.slice(0, 500) }, deps.clientKey(ip));
+    if (result?.limited === true) {
+      deps.log({ route: "POST /api/collect", type: "meta_view", status: 429 });
+      return json(429, { error: "too many requests" });
+    }
+    deps.log({ route: "POST /api/collect", type: "meta_view", status: 200, sent: result?.sent === true, latency_ms: Date.now() - started });
+    return json(200, { ok: true });
+  } catch (error) {
+    deps.log({ route: "POST /api/collect", type: "meta_view", status: 500, error_code: (error as { code?: string } | null)?.code ?? "unknown" });
+    return json(500, { error: "internal error" });
   }
 }
 

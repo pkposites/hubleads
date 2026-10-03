@@ -21,12 +21,14 @@ function load(url: string, { referrer = "", attrs = {} as Record<string, string>
   const sent: Sent[] = [];
   // The anonymous visit count goes apart: the other tests follow the events.
   const visits: Sent[] = [];
+  // Page views without cookies (measurement for Meta) go apart too.
+  const views: Sent[] = [];
   // Without sendBeacon the tracker falls back to fetch, whose body is a string.
   Object.defineProperty(navigator, "sendBeacon", { value: undefined, configurable: true });
   const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
     if (init?.method === "POST") {
       const body = JSON.parse(String(init.body));
-      (body.type === "visit" ? visits : sent).push(body);
+      (body.type === "visit" ? visits : body.type === "meta_view" ? views : sent).push(body);
     }
     return new Response(JSON.stringify({ whatsapp_code: true }));
   });
@@ -56,10 +58,10 @@ function load(url: string, { referrer = "", attrs = {} as Record<string, string>
 
   const posted = () =>
     fetchMock.mock.calls.filter(
-      ([u, init]) => init?.method === "POST" && u === "https://leadhub.test/api/collect" && !String(init.body).includes('"type":"visit"'),
+      ([u, init]) => init?.method === "POST" && u === "https://leadhub.test/api/collect" && !/"type":"(visit|meta_view)"/.test(String(init.body)),
     );
   const flush = () => new Promise((r) => setTimeout(r, 0));
-  return { sent, visits, posted, openMock, flush };
+  return { sent, visits, views, posted, openMock, flush };
 }
 
 function whatsappLink(href: string) {
@@ -272,7 +274,7 @@ describe("tracker.js", () => {
       Object.assign(window, { fbq });
       localStorage.setItem("lh_vid", "antigo123456");
       const { sent, flush } = load("/", { attrs: { "data-consent": "banner" } });
-      button("Recusar").click();
+      button("Recusar cookies").click();
       await flush();
       expect(fbq).toHaveBeenCalledWith("consent", "revoke");
       expect(localStorage.getItem("lh_consent")).toBe("denied");
@@ -324,9 +326,77 @@ describe("tracker.js", () => {
       expect(Object.keys(localStorage).filter((k) => k.startsWith("lh_"))).toEqual([]);
 
       // Refusing does not undo the count, and accepting does not count twice.
-      button("Recusar").click();
+      button("Recusar cookies").click();
       await flush();
       expect(visits).toHaveLength(1);
+    });
+
+    describe("measurement without cookies", () => {
+      const hide = () => {
+        Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+        document.dispatchEvent(new Event("visibilitychange"));
+        Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+      };
+
+      it("sends the page view once when the visitor refuses, with only the ad click id and the page", async () => {
+        const { views, flush } = load("/lp?utm_source=facebook&fbclid=IwAR1abc_-9&email=a@b.com", { attrs: { "data-consent": "banner" } });
+        await flush();
+        expect(views).toEqual([]);
+        button("Recusar cookies").click();
+        hide();
+        await flush();
+        expect(views).toHaveLength(1);
+        expect(views[0]).toEqual({
+          key: "pk_test",
+          type: "meta_view",
+          visitor_id: "anonymous",
+          minimal: { landing_url: "http://localhost:3000/lp", fbc: expect.stringMatching(/^fb\.1\.\d{13}\.IwAR1abc_-9$/) },
+        });
+        expect(Object.keys(localStorage).filter((k) => k.startsWith("lh_") && k !== "lh_consent")).toEqual([]);
+        expect(document.cookie).not.toContain("_fbc");
+
+        // Next page of someone who refused: counted on load, no banner.
+        const again = load("/lp", { attrs: { "data-consent": "banner" } });
+        await again.flush();
+        expect(again.views).toHaveLength(1);
+        expect(again.views[0].minimal).toEqual({ landing_url: "http://localhost:3000/lp" });
+      });
+
+      it("counts an undecided visitor when the page is left, and not one who accepts", async () => {
+        const undecided = load("/?fbclid=IwAR1", { attrs: { "data-consent": "banner" } });
+        await undecided.flush();
+        hide();
+        hide();
+        await undecided.flush();
+        expect(undecided.views).toHaveLength(1);
+
+        const accepts = load("/?fbclid=IwAR1", { attrs: { "data-consent": "banner" } });
+        button("Aceitar").click();
+        hide();
+        await accepts.flush();
+        expect(accepts.views).toEqual([]);
+      });
+
+      it("sends the ad click id with a WhatsApp click without consent, and nothing else of the visit", async () => {
+        const { sent, flush } = load("/lp?utm_campaign=Gestantes&fbclid=IwAR1", { attrs: { "data-consent": "banner" } });
+        whatsappLink("https://wa.me/5511999999999").click();
+        await flush();
+        expect(sent[0]).toMatchObject({
+          type: "whatsapp_click",
+          consent: false,
+          minimal: { landing_url: "http://localhost:3000/lp", fbc: expect.stringMatching(/\.IwAR1$/) },
+        });
+        expect(sent[0]).not.toHaveProperty("attribution");
+      });
+
+      it("does nothing on pages without the consent option", async () => {
+        const { views, sent, flush } = load("/?fbclid=IwAR1");
+        hide();
+        whatsappLink("https://wa.me/5511999999999").click();
+        await flush();
+        expect(views).toEqual([]);
+        expect(sent.find((e) => e.type === "whatsapp_click")).not.toHaveProperty("minimal");
+      });
     });
 
     it("keeps the original behaviour on pages without the option", async () => {

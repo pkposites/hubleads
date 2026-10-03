@@ -29,7 +29,16 @@
   navegador é enviada; o clique no WhatsApp registra só o contato digitado
   (origem "não coletada"). O aceite libera também o pixel da Meta e as tags do
   Google (`fbq('consent')` / consent mode). A recusa apaga o que estava guardado.
-- **Nada vai para a Meta** de quem recusou o rastreamento.
+- **Medição sem cookies** (`lh_meta_configs.minimal_tracking`, ligada por
+  padrão, desligável no cadastro do cliente): de quem recusou ou ignorou o
+  aviso, o servidor do Lead Hub manda à Meta só a visita (`PageView`, não
+  guardada), o clique no WhatsApp (`Lead`) e depois Agendado/Venda, com o
+  identificador do clique lido do endereço (fbclid → `fbc`, nunca cookie), IP e
+  navegador. Sem nome, telefone, id do visitante, `_fbp` ou campanha. Base:
+  legítimo interesse (art. 7º, IX e art. 10), informado no aviso e na política
+  pública. Com a opção desligada (ou sem Meta configurada), nada vai e o banco
+  descarta IP, navegador e fbc dessas pessoas. Recomendado validar o texto com
+  o jurídico de cada cliente, em especial na área da saúde.
 - **Política de privacidade pública** por cliente (`/privacidade/<cliente>`),
   com controlador, contato, finalidades e bases legais, compartilhamento,
   transferência internacional, prazos e direitos do titular (art. 18). É um

@@ -44,6 +44,34 @@ const post = (body: unknown, headers: Record<string, string> = {}) =>
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 
+describe("page views without cookies", () => {
+  const view = { key: "pk_ok", type: "meta_view", visitor_id: "anonymous", minimal: { fbc: "fb.1.1759500000000.IwAR1", landing_url: "https://clinica.com.br/lp?x=1" } };
+
+  it("hands Meta only the click id, the page, IP and browser, and stores nothing", async () => {
+    const metaView = vi.fn<NonNullable<CollectDeps["metaView"]>>(async () => ({ sent: true }));
+    const d = deps({ metaView });
+    const response = await handleCollect(post(view, { "X-Real-IP": "200.1.2.3" }), d);
+    expect(response.status).toBe(200);
+    expect(d.collect).not.toHaveBeenCalled();
+    expect(metaView).toHaveBeenCalledWith(
+      "pk_ok",
+      "clinica.com.br",
+      { fbc: "fb.1.1759500000000.IwAR1", url: "https://clinica.com.br/lp", ip: "200.1.2.3", userAgent: expect.stringContaining("iPhone") },
+      "k-200.1.2.3",
+    );
+    expect(JSON.stringify(d.logs)).not.toContain("200.1.2.3");
+    expect(JSON.stringify(d.logs)).not.toContain("IwAR1");
+  });
+
+  it("ignores bots and answers 429 over the limit", async () => {
+    const metaView = vi.fn<NonNullable<CollectDeps["metaView"]>>(async () => ({ limited: true }));
+    const bot = deps({ metaView });
+    await handleCollect(post(view, { "X-Real-IP": "200.1.2.3", "User-Agent": "facebookexternalhit/1.1" }), bot);
+    expect(metaView).not.toHaveBeenCalled();
+    expect((await handleCollect(post(view, { "X-Real-IP": "200.1.2.3" }), deps({ metaView }))).status).toBe(429);
+  });
+});
+
 describe("anonymous visits", () => {
   const visit = {
     key: "pk_ok",
@@ -118,8 +146,22 @@ describe("POST /api/collect", () => {
     );
     const forwarded = (d.collect as ReturnType<typeof vi.fn>).mock.calls[0][2];
     expect(forwarded).toMatchObject({ consent: false, channel: "sem_consentimento", name: "Maria", phone: "+5511912345678", attribution: {}, url_params: {} });
-    expect(forwarded.ip_address).toBeUndefined();
-    expect(forwarded.user_agent).toBeUndefined();
+    // IP and browser go to the database, which keeps them only for the measurement without cookies.
+    expect(forwarded.ip_address).toBe("200.1.2.3");
+  });
+
+  it("keeps only a valid ad click id and the page without parameters for the measurement without cookies", async () => {
+    const d = deps();
+    await handleCollect(
+      post({ ...event, consent: false, minimal: { fbc: "fb.1.1759500000000.IwAR1abc", landing_url: "https://clinica.com.br/lp?email=a@b.com" } }),
+      d,
+    );
+    const forwarded = (d.collect as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    expect(forwarded.attribution).toEqual({ fbc: "fb.1.1759500000000.IwAR1abc", landing_url: "https://clinica.com.br/lp" });
+
+    const bad = deps();
+    await handleCollect(post({ ...event, consent: false, minimal: { fbc: "fb.1.x.<script>", landing_url: "javascript:alert(1)" } }), bad);
+    expect((bad.collect as ReturnType<typeof vi.fn>).mock.calls[0][2].attribution).toEqual({});
   });
 
   it("drops page events with no commercial meaning", async () => {
@@ -135,7 +177,7 @@ describe("POST /api/collect", () => {
     const onNewLead = vi.fn();
     const created = deps({ onNewLead, collect: vi.fn(async () => ({ ok: true, lead_id: "L1", new_lead: true })) });
     await handleCollect(post(event), created);
-    expect(onNewLead).toHaveBeenCalledWith("L1");
+    expect(onNewLead).toHaveBeenCalledWith("L1", { consent: null });
 
     const repeat = deps({ onNewLead, collect: vi.fn(async () => ({ ok: true, lead_id: "L1", new_lead: false })) });
     await handleCollect(post(event), repeat);
