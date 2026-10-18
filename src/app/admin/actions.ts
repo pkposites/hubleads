@@ -121,7 +121,7 @@ export async function requestAdminReset(_prev: AdminFormState, formData: FormDat
   const secret = serverSecret();
   const base = publicAppUrl();
   if (!secret || !base || !mailReady()) {
-    return { error: "A recuperação por e-mail ainda não está configurada. Fale com o administrador do Lead Hub.", login };
+    return { error: "A recuperação por e-mail ainda não está configurada. Fale com o administrador do Cadê o Lead.", login };
   }
   const started = Date.now();
   const reset = await call<{ token: string; login: string } | null>("lh_server_admin_reset_request", {

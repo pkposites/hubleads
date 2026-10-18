@@ -14,9 +14,9 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 pt-3 md:flex-row md:items-center md:gap-6 md:pb-3">
           <div className="flex items-center justify-between gap-3">
             <Link href="/admin" className="flex items-center gap-2 font-semibold">
-              <span className="grid size-7 place-items-center rounded-lg bg-emerald-500 text-sm text-zinc-900">L</span>
+              <span className="grid size-7 place-items-center rounded-lg bg-emerald-500 text-sm text-zinc-900">C</span>
               <span>
-                Lead Hub <span className="font-normal text-zinc-400">· Painel mãe</span>
+                Cadê o Lead <span className="hidden font-normal text-zinc-400 sm:inline">· Painel mãe</span>
               </span>
             </Link>
             <div className="flex items-center gap-2 md:hidden">

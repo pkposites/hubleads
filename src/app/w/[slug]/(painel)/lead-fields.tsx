@@ -676,7 +676,7 @@ export function HistoryButton({ lead, className = "" }: { lead: Lead; className?
               <a href={`/w/${slug}/dados/${lead.id}`} className="font-medium underline">
                 Exportar dados deste lead (pedido LGPD)
               </a>
-              <span className="block text-xs text-zinc-500">Arquivo com tudo o que o Lead Hub guarda sobre a pessoa. Fica registrado.</span>
+              <span className="block text-xs text-zinc-500">Arquivo com tudo o que o Cadê o Lead guarda sobre a pessoa. Fica registrado.</span>
             </p>
           )}
           {pending && !history && <p className="text-sm text-zinc-500">Carregando...</p>}

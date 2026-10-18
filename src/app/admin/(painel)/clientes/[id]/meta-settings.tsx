@@ -46,7 +46,7 @@ export function MetaSettings({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-zinc-600">
-        Quando o atendente marca um lead como <strong>Agendado</strong>, o Lead Hub envia o evento <code>Schedule</code>; quando marca{" "}
+        Quando o atendente marca um lead como <strong>Agendado</strong>, o Cadê o Lead envia o evento <code>Schedule</code>; quando marca{" "}
         <strong>Venda</strong> com valor, envia <code>Purchase</code> com o valor. Cada evento vai uma vez por lead, com telefone e nome
         criptografados (SHA-256), fbc, fbp, IP e navegador do clique, para a Meta atribuir ao anúncio. Leads de formulário nativo vão como
         eventos de CRM (<code>Lead</code> ao chegar, depois <code>Schedule</code> e <code>Purchase</code>) com o ID do lead da Meta.
@@ -63,7 +63,7 @@ export function MetaSettings({
             {data.failures_24h} {data.failures_24h === 1 ? "envio falhou" : "envios falharam"} nas últimas 24 horas.
           </p>
           <p className="mt-1">
-            O Lead Hub tenta de novo sozinho a cada hora (até 6 vezes por evento, por até 7 dias). Se o erro falar em token (&quot;OAuth&quot;,
+            O Cadê o Lead tenta de novo sozinho a cada hora (até 6 vezes por evento, por até 7 dias). Se o erro falar em token (&quot;OAuth&quot;,
             &quot;access token&quot;), gere um token novo no Gerenciador de Eventos e salve aqui.
             {data.last_ok_at ? ` Último envio aceito: ${formatDateTime(data.last_ok_at)}.` : ""}
           </p>
@@ -75,7 +75,7 @@ export function MetaSettings({
           <p className="font-medium">A landing page também envia {data.lp_conflicts.join(" e ")} pelo pixel ou pelo GTM.</p>
           <p className="mt-1">
             A Meta contaria o mesmo resultado duas vezes. Mude o nome desse evento na LP (por exemplo, &quot;CliqueAgendar&quot;) ou desligue a
-            opção correspondente abaixo. O evento do Lead Hub é o confiável: só vai quando o atendente confirma.
+            opção correspondente abaixo. O evento do Cadê o Lead é o confiável: só vai quando o atendente confirma.
           </p>
         </div>
       )}

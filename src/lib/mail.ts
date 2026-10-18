@@ -17,7 +17,7 @@ export async function sendMail(message: { to: string; subject: string; text: str
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: process.env.LH_MAIL_FROM || "Lead Hub <onboarding@resend.dev>", ...message }),
+      body: JSON.stringify({ from: process.env.LH_MAIL_FROM || "Cadê o Lead <onboarding@resend.dev>", ...message }),
       signal: AbortSignal.timeout(10_000),
     });
     // Status only: never log the address or the content.
@@ -40,15 +40,15 @@ export function publicAppUrl(): string | null {
 }
 
 export function resetPasswordEmail(link: string) {
-  const subject = "Lead Hub: criar uma senha nova";
-  const text = `Recebemos um pedido para criar uma senha nova no painel do Lead Hub.
+  const subject = "Cadê o Lead: criar uma senha nova";
+  const text = `Recebemos um pedido para criar uma senha nova no painel do Cadê o Lead.
 
 Para criar a senha, abra este link (vale por 30 minutos e só pode ser usado uma vez):
 ${link}
 
 Se não foi você, ignore este e-mail: sua senha continua a mesma.`;
   const html = `<div style="font-family:Arial,sans-serif;font-size:15px;color:#18181b;max-width:480px">
-<p>Recebemos um pedido para criar uma senha nova no painel do <strong>Lead Hub</strong>.</p>
+<p>Recebemos um pedido para criar uma senha nova no painel do <strong>Cadê o Lead</strong>.</p>
 <p><a href="${link}" style="display:inline-block;background:#18181b;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Criar senha nova</a></p>
 <p style="font-size:13px;color:#52525b">O link vale por 30 minutos e só pode ser usado uma vez. Se não foi você, ignore este e-mail: sua senha continua a mesma.</p>
 </div>`;

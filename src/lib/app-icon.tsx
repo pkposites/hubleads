@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-/** The app icon: "LH" on a dark square, with room for maskable cropping. */
+/** The app icon: "CL" (Cadê o Lead) on a dark square, with room for maskable cropping. */
 export function appIcon(size: number) {
   return new ImageResponse(
     (
@@ -19,7 +19,7 @@ export function appIcon(size: number) {
         }}
       >
         <div style={{ display: "flex", alignItems: "baseline" }}>
-          LH<span style={{ color: "#10b981" }}>.</span>
+          CL<span style={{ color: "#10b981" }}>.</span>
         </div>
       </div>
     ),

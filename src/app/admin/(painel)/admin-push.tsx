@@ -11,7 +11,7 @@ export function AdminPush({ vapidKey, master }: { vapidKey: string | null; maste
       subscribe={adminPushSubscribe}
       unsubscribe={adminPushUnsubscribe}
       dark
-      description={`Receba uma notificação a cada lead novo de ${master ? "todos os clientes" : "todos os seus clientes"} (landing page, formulário ou planilha), com o nome do cliente, mesmo com o Lead Hub fechado. Tocar no aviso abre o cliente.`}
+      description={`Receba uma notificação a cada lead novo de ${master ? "todos os clientes" : "todos os seus clientes"} (landing page, formulário ou planilha), com o nome do cliente, mesmo com o Cadê o Lead fechado. Tocar no aviso abre o cliente.`}
     />
   );
 }

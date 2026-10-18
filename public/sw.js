@@ -7,7 +7,7 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: "Lead Hub", body: event.data ? event.data.text() : "" };
+    data = { title: "Cadê o Lead", body: event.data ? event.data.text() : "" };
   }
   event.waitUntil(
     self.registration.showNotification(data.title || "Novo lead", {

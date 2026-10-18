@@ -28,7 +28,7 @@ const TYPE_LABEL: Record<string, string> = {
 function eventName(e: LeadEvent) {
   if (e.type === "lp_event") {
     const inner = e.data.data as { event?: string; source?: string } | undefined;
-    const source = { pixel: "pixel", gtm: "GTM", gtag: "gtag", api: "Lead Hub" }[inner?.source ?? ""];
+    const source = { pixel: "pixel", gtm: "GTM", gtag: "gtag", api: "Cadê o Lead" }[inner?.source ?? ""];
     return `${eventLabel(inner?.event ?? "evento")}${source ? ` (${source})` : ""}`;
   }
   return TYPE_LABEL[e.type] ?? eventLabel(e.type);

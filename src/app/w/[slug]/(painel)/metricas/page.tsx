@@ -269,7 +269,7 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
         <div>
           <h2 className="text-sm font-semibold">Eventos da landing page</h2>
           <p className="text-xs text-zinc-500">
-            O que a LP registrou pelo pixel da Meta, pelo Google Tag Manager ou pelo Lead Hub. Visualizações de página, rolagem e
+            O que a LP registrou pelo pixel da Meta, pelo Google Tag Manager ou pelo Cadê o Lead. Visualizações de página, rolagem e
             eventos parecidos ficam de fora.
           </p>
         </div>

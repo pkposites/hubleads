@@ -36,7 +36,7 @@ export function SheetSources({ workspaceId, sources }: { workspaceId: string; so
     <div className="flex flex-col gap-4 text-sm">
       <p className="text-zinc-600">
         Para leads que já caem numa planilha do Google, como a integração nativa dos formulários da Meta com o Google Sheets. Um
-        script na planilha manda cada linha nova para o Lead Hub a cada minuto. Linhas com o ID do lead da Meta viram
+        script na planilha manda cada linha nova para o Cadê o Lead a cada minuto. Linhas com o ID do lead da Meta viram
         &quot;Formulário Meta&quot; e voltam para a Meta como eventos de CRM (Agendado e Venda). As demais viram &quot;Planilha&quot;.
       </p>
 
@@ -73,7 +73,7 @@ export function SheetSources({ workspaceId, sources }: { workspaceId: string; so
                   variant="danger"
                   disabled={busy}
                   onClick={() => {
-                    if (window.confirm(`Remover "${s.name}"? Os leads que já chegaram continuam na planilha do Lead Hub.`)) {
+                    if (window.confirm(`Remover "${s.name}"? Os leads que já chegaram continuam na planilha do Cadê o Lead.`)) {
                       run(async () => updateSheetSource(workspaceId, s.id, { remove: true }));
                     }
                   }}

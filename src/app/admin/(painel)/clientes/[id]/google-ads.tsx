@@ -40,7 +40,7 @@ export function GoogleAds({ workspaceId, data, origin }: { workspaceId: string; 
   const intro = (
     <div className="flex flex-col gap-1 text-zinc-700">
       <p>
-        <strong>Para que serve:</strong> quando alguém que clicou num anúncio do Google vira lead, agenda ou compra, o Lead Hub conta isso para o
+        <strong>Para que serve:</strong> quando alguém que clicou num anúncio do Google vira lead, agenda ou compra, o Cadê o Lead conta isso para o
         Google Ads. Assim o Google aprende quem vira cliente e passa a mostrar o anúncio para pessoas parecidas.
       </p>
       <p className="text-zinc-600">
@@ -220,7 +220,7 @@ function Guide({ names, open }: { names: { lead_name: string; schedule_name: str
             </li>
             <li>
               Abre a tela <strong>Configurar conexão</strong>. Em <strong>Conectar uma origem</strong>, cole o <strong>endereço</strong> (termina em{" "}
-              <code>.csv</code>), o <strong>usuário</strong> e a <strong>senha</strong> do Lead Hub, mostrados acima.
+              <code>.csv</code>), o <strong>usuário</strong> e a <strong>senha</strong> do Cadê o Lead, mostrados acima.
             </li>
             <li>
               Em <strong>Selecionar dados</strong> e <strong>Mapear campos</strong>, as colunas já vêm com os nomes que o Google espera (Google Click
@@ -234,11 +234,11 @@ function Guide({ names, open }: { names: { lead_name: string; schedule_name: str
         </section>
         <section className="rounded-md bg-zinc-50 p-2 text-xs text-zinc-600">
           <p>
-            <strong>Pronto.</strong> Para conferir se está funcionando: aqui no Lead Hub aparece &quot;Última busca do Google&quot;, e no Google Ads,
+            <strong>Pronto.</strong> Para conferir se está funcionando: aqui no Cadê o Lead aparece &quot;Última busca do Google&quot;, e no Google Ads,
             em Uploads, fica o histórico de cada busca.
           </p>
           <p className="mt-1">
-            <strong>Só entram leads que clicaram num anúncio do Google.</strong> Para isso, a LP precisa ter o código do Lead Hub instalado e a
+            <strong>Só entram leads que clicaram num anúncio do Google.</strong> Para isso, a LP precisa ter o código do Cadê o Lead instalado e a
             opção <strong>codificação automática</strong> precisa estar ligada no Google Ads (em Configurações da conta; já vem ligada).
           </p>
           <p className="mt-1">

@@ -12,7 +12,7 @@ export function PushToggle({ vapidKey }: { vapidKey: string | null }) {
       vapidKey={vapidKey}
       subscribe={(s) => pushSubscribe(slug, s as never)}
       unsubscribe={(endpoint) => pushUnsubscribe(slug, endpoint)}
-      description="Receba uma notificação a cada lead novo, mesmo com o Lead Hub fechado. Responder rápido aumenta muito as vendas."
+      description="Receba uma notificação a cada lead novo, mesmo com o Cadê o Lead fechado. Responder rápido aumenta muito as vendas."
     />
   );
 }

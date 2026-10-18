@@ -57,8 +57,8 @@ export function evaluateInfra(n: InfraNumbers, limitMb: number): InfraStatus {
     else if (n.clients >= 3) amber.push(`${n.clients} clientes já dependem do projeto compartilhado.`);
     if (n.leads >= 2000) red.push(`${n.leads.toLocaleString("pt-BR")} leads: a migração fica mais demorada a cada semana.`);
     else if (n.leads >= 500) amber.push(`${n.leads.toLocaleString("pt-BR")} leads: a migração começa a ficar mais trabalhosa.`);
-    if (n.lh_bytes >= 150 * MB) red.push(`O Lead Hub já ocupa ${formatMb(n.lh_bytes)} do banco compartilhado.`);
-    else if (n.lh_bytes >= 50 * MB) amber.push(`O Lead Hub já ocupa ${formatMb(n.lh_bytes)} do banco compartilhado.`);
+    if (n.lh_bytes >= 150 * MB) red.push(`O Cadê o Lead já ocupa ${formatMb(n.lh_bytes)} do banco compartilhado.`);
+    else if (n.lh_bytes >= 50 * MB) amber.push(`O Cadê o Lead já ocupa ${formatMb(n.lh_bytes)} do banco compartilhado.`);
   }
 
   const level: InfraLevel = red.length ? "trocar" : amber.length ? "atencao" : "ok";

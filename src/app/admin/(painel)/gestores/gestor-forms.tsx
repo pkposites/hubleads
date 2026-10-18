@@ -6,7 +6,7 @@ import { CopyButton } from "@/components/copy-button";
 import { createGestor, deactivateGestor, resetGestorPassword } from "../../actions";
 
 function Credentials({ origin, login, password }: { origin: string; login: string; password: string }) {
-  const text = `Acesso ao Lead Hub (painel de gestor)\nEndereço: ${origin}/admin\nE-mail: ${login}\nSenha: ${password}`;
+  const text = `Acesso ao Cadê o Lead (painel de gestor)\nEndereço: ${origin}/admin\nE-mail: ${login}\nSenha: ${password}`;
   return (
     <div className="flex flex-col gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
       <p className="font-medium text-emerald-900">Envie estes dados ao gestor. A senha não aparece de novo.</p>

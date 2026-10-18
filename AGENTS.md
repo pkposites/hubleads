@@ -50,3 +50,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   takes a client or page id must call `lh_private.admin_check_workspace` first
   (tests/db/gestores.test.ts enforces it for all of them).
 - UI copy is in Brazilian Portuguese.
+- The product is shown to users as "Cadê o Lead" (cadeolead.com.br); code, database
+  (`lh_*`) and the Meta CRM name (`CRM_SOURCE_NAME`) keep "Lead Hub". Google Ads
+  conversion names stay "Lead Hub - ..." (clients created them with those names).

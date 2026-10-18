@@ -39,7 +39,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
         <header className="border-b border-zinc-200 bg-white">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2 sm:px-4 sm:py-3">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="font-semibold">Lead Hub</span>
+              <span className="font-semibold">Cadê o Lead</span>
               <span className="text-sm text-zinc-400">/</span>
               <span className="truncate text-sm font-medium">{workspace.name}</span>
             </div>

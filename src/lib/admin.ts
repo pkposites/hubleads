@@ -73,16 +73,16 @@ export function snippet(origin: string, page: Pick<Page, "public_key">) {
 /** Instructions to paste into the landing page's Claude Code (or hand to its developer). */
 export function installPrompt(origin: string, page: Pick<Page, "public_key">) {
   const policy = `${origin}/privacidade/${page.public_key}`;
-  return `Quero conectar esta landing page ao Lead Hub, que registra cada contato pelo WhatsApp numa planilha com a origem do anúncio, respeitando a LGPD.
+  return `Quero conectar esta landing page ao Cadê o Lead, que registra cada contato pelo WhatsApp numa planilha com a origem do anúncio, respeitando a LGPD.
 
 1. Adicione este script em todas as páginas, dentro do <head>, logo depois do pixel da Meta (sem pixel: logo depois da tag do Google/GTM; sem nenhum dos dois: no início do <head>). Não altere os scripts atuais de UTMs e eventos:
 
 ${snippet(origin, page)}
 
-   O data-consent="banner" mostra um aviso curto de cookies (Aceitar / Recusar cookies). Sem aceite, nada fica guardado no aparelho da pessoa; a visita e o clique no WhatsApp ainda contam para a Meta pelo servidor do Lead Hub, sem cookies (medição mínima, ligada no cadastro do cliente). Não crie nenhum envio próprio para isso na LP.
+   O data-consent="banner" mostra um aviso curto de cookies (Aceitar / Recusar cookies). Sem aceite, nada fica guardado no aparelho da pessoa; a visita e o clique no WhatsApp ainda contam para a Meta pelo servidor do Cadê o Lead, sem cookies (medição mínima, ligada no cadastro do cliente). Não crie nenhum envio próprio para isso na LP.
    Se a página já tiver um banner de cookies próprio, troque por data-consent="required" e chame window.LeadHub?.consent(true) ao aceitar e window.LeadHub?.consent(false) ao recusar (não mostre os dois banners).
 
-2. LGPD no pixel da Meta e no Google: para que também só rodem depois do aceite, no código do pixel coloque fbq('consent', 'revoke'); ANTES de fbq('init', ...). Se houver Google Tag Manager/gtag, antes dele: gtag('consent', 'default', { ad_storage: 'denied', analytics_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });. O Lead Hub libera os dois quando a pessoa aceita. Não mude mais nada no pixel.
+2. LGPD no pixel da Meta e no Google: para que também só rodem depois do aceite, no código do pixel coloque fbq('consent', 'revoke'); ANTES de fbq('init', ...). Se houver Google Tag Manager/gtag, antes dele: gtag('consent', 'default', { ad_storage: 'denied', analytics_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });. O Cadê o Lead libera os dois quando a pessoa aceita. Não mude mais nada no pixel.
 
 3. Em TODOS os botões de contato/WhatsApp, antes de abrir o WhatsApp, mostre um passo curto pedindo:
    - Nome (obrigatório)
@@ -92,7 +92,7 @@ ${snippet(origin, page)}
 
 4. Ao confirmar esse passo:
      window.LeadHub?.identify({ name: nome, phone: telefone });
-   e abra o WhatsApp passando a URL pelo Lead Hub:
+   e abra o WhatsApp passando a URL pelo Cadê o Lead:
      const destino = window.LeadHub ? window.LeadHub.whatsappUrl(url) : url;
    Use "destino" no lugar da URL original, do jeito que a página já abre hoje (link, window.open ou location.href).
 
@@ -101,9 +101,9 @@ ${snippet(origin, page)}
    Use rótulos curtos em português como chave (viram colunas na planilha) e o texto da opção como valor.
    Se alguma pergunta for sobre saúde (sintomas, tratamentos, condições), inclua antes do envio uma caixa de seleção, desmarcada, obrigatória para enviar essas respostas: "Autorizo o uso das minhas respostas sobre saúde somente para o meu atendimento." Sem a marcação, não chame LeadHub.set com essas respostas.
 
-6. Anúncios (Meta e Google Ads): não remova nem reescreva os parâmetros do endereço (utm_*, fbclid, gclid, gbraid, wbraid). Se a página redireciona (www, http→https, outra rota, página de obrigado), mantenha tudo o que vem depois do "?". Se a página já tem a tag do Google (gtag ou GTM), mantenha-a como está: o Lead Hub também lê dela o clique do anúncio do Google.
+6. Anúncios (Meta e Google Ads): não remova nem reescreva os parâmetros do endereço (utm_*, fbclid, gclid, gbraid, wbraid). Se a página redireciona (www, http→https, outra rota, página de obrigado), mantenha tudo o que vem depois do "?". Se a página já tem a tag do Google (gtag ou GTM), mantenha-a como está: o Cadê o Lead também lê dela o clique do anúncio do Google.
 
 7. Não mexa na Conversions API. No final, liste os botões alterados, como cada um abre o WhatsApp, onde ficou o link da política e se a página tem algum redirecionamento (e se ele mantém os parâmetros).
 
-Para testar: abra a página com ?utm_source=teste, aceite os cookies, preencha nome e telefone e clique no WhatsApp. A mensagem deve terminar com "(cód. XXXX)" e o contato aparece na planilha do Lead Hub. Em outra janela anônima, recuse os cookies: o contato ainda aparece, mas com a origem "não coletada". Se o cliente anuncia no Google, teste também com ?gclid=teste-leadhub: o contato deve aparecer com a origem "Google Ads" (depois apague esse contato de teste na planilha).`;
+Para testar: abra a página com ?utm_source=teste, aceite os cookies, preencha nome e telefone e clique no WhatsApp. A mensagem deve terminar com "(cód. XXXX)" e o contato aparece na planilha do Cadê o Lead. Em outra janela anônima, recuse os cookies: o contato ainda aparece, mas com a origem "não coletada". Se o cliente anuncia no Google, teste também com ?gclid=teste-leadhub: o contato deve aparecer com a origem "Google Ads" (depois apague esse contato de teste na planilha).`;
 }

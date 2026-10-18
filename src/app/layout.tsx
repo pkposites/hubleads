@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lead Hub",
+  title: "Cadê o Lead",
   description: "Leads e mensuração do anúncio até a venda.",
-  appleWebApp: { capable: true, title: "Lead Hub", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Cadê o Lead", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = { themeColor: "#18181b" };

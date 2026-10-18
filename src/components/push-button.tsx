@@ -125,7 +125,7 @@ export function PushButton({
               <ol className="list-decimal space-y-1 pl-5">
                 <li>No Safari, toque em Compartilhar (quadrado com a seta).</li>
                 <li>Escolha &quot;Adicionar à Tela de Início&quot;.</li>
-                <li>Abra o Lead Hub pelo ícone e toque em &quot;Ativar avisos&quot;.</li>
+                <li>Abra o Cadê o Lead pelo ícone e toque em &quot;Ativar avisos&quot;.</li>
               </ol>
             )}
             {state === "denied" && (

@@ -112,7 +112,7 @@ export default async function PrivacyPage({ params }: PageProps<"/privacidade/[r
       <Section title="4. Com quem compartilhamos">
         <p>Não vendemos seus dados. Eles são tratados por empresas que nos prestam serviço, apenas para as finalidades acima:</p>
         <ul className="list-disc space-y-1 pl-5">
-          <li>Lead Hub, sistema de gestão de contatos que organiza o atendimento (operador).</li>
+          <li>Cadê o Lead, sistema de gestão de contatos que organiza o atendimento (operador).</li>
           <li>Supabase, banco de dados com servidores no Brasil (São Paulo), e Netlify, hospedagem do sistema (Estados Unidos).</li>
           <li>
             Meta Platforms (Facebook e Instagram): com o seu consentimento, dados de navegação para medir anúncios

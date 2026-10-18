@@ -65,7 +65,7 @@ export function LeadForms({ workspaceId, data, serverReady }: { workspaceId: str
       <p className="text-zinc-600">
         Os leads dos formulários nativos (Facebook e Instagram) caem direto na planilha e na fila Atender, em até 1 minuto, com
         campanha, conjunto, anúncio e as respostas. Quando o atendente marca <strong>Agendado</strong> ou <strong>Venda</strong>, o
-        Lead Hub avisa a Meta como evento de CRM (com o ID do lead), usando o conjunto de dados do cartão abaixo.
+        Cadê o Lead avisa a Meta como evento de CRM (com o ID do lead), usando o conjunto de dados do cartão abaixo.
       </p>
       {!serverReady && <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-800">Falta configurar LH_SERVER_SECRET e LH_ENCRYPTION_KEY no servidor.</p>}
 

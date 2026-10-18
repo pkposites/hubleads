@@ -147,7 +147,7 @@ export function mapSheetRow(row: Record<string, unknown>, sourceId: string): Sou
 
 /** The Apps Script the admin pastes in the sheet (Extensões → Apps Script). */
 export function appsScript(endpoint: string, key: string) {
-  return `// Lead Hub: envia as linhas novas desta planilha para o Lead Hub, a cada minuto.
+  return `// Cadê o Lead: envia as linhas novas desta planilha para o Cadê o Lead, a cada minuto.
 // 1. Em Extensões → Apps Script, deixe o editor TOTALMENTE VAZIO (Ctrl+A / Cmd+A e Delete,
 //    inclusive o "function myFunction() { }" que já vem lá). Só então cole este código e salve.
 // 2. No menu de funções, escolha "instalar" e clique em Executar. Autorize com a sua conta Google.
@@ -166,7 +166,7 @@ function instalar() {
   ScriptApp.newTrigger("enviarLeads").timeBased().everyMinutes(1).create();
   // Começa pelas linhas novas; as que já existem ficam de fora (use importarTudo para mandá-las).
   PropertiesService.getScriptProperties().setProperty("ultimaLinha", String(aba_().getLastRow()));
-  console.log("Lead Hub instalado. As próximas linhas serão enviadas a cada minuto.");
+  console.log("Cadê o Lead instalado. As próximas linhas serão enviadas a cada minuto.");
 }
 
 function importarTudo() {
@@ -207,7 +207,7 @@ function enviarLeads() {
       });
       if (resposta.getResponseCode() !== 200) {
         // Tenta de novo no próximo minuto, a partir das mesmas linhas.
-        console.log("Lead Hub respondeu " + resposta.getResponseCode() + ": " + resposta.getContentText().slice(0, 200));
+        console.log("Cadê o Lead respondeu " + resposta.getResponseCode() + ": " + resposta.getContentText().slice(0, 200));
         return;
       }
       ultima = fim;

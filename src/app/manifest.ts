@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Lead Hub",
-    short_name: "Lead Hub",
+    name: "Cadê o Lead",
+    short_name: "Cadê o Lead",
     description: "Leads da Landing Page, do anúncio ao atendimento.",
     start_url: "/",
     display: "standalone",
@@ -11,9 +11,9 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#18181b",
     lang: "pt-BR",
     icons: [
-      { src: "/app-icon/192", sizes: "192x192", type: "image/png" },
-      { src: "/app-icon/512", sizes: "512x512", type: "image/png" },
-      { src: "/app-icon/512", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/app-icon/192?v=2", sizes: "192x192", type: "image/png" },
+      { src: "/app-icon/512?v=2", sizes: "512x512", type: "image/png" },
+      { src: "/app-icon/512?v=2", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }
