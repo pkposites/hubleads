@@ -10,6 +10,8 @@ import { dbLimitMb, evaluateInfra, type InfraNumbers } from "@/lib/infra";
 import { IdleAlert } from "./idle-alert";
 import { InfraAlert } from "./infra-alert";
 
+const ACTIVITY_DOT = { recebendo: "bg-emerald-500", parado: "bg-amber-500", aguardando: "bg-zinc-300" } as const;
+
 export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   const { token, role } = await requireAdmin();
   const deleted = (await searchParams).apagado;
@@ -25,6 +27,15 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
     return sig === signature && (mode === "min" || mode === "hide") ? mode : "open";
   };
   const now = new Date();
+  const idle = idleClients(clients, now);
+  // Most recent activity first: the clients that matter today are on top.
+  const lastActivity = (c: ClientSummary) => [c.last_lead_at, c.last_event_at, c.created_at].filter(Boolean).sort().at(-1) ?? "";
+  const sorted = [...clients].sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)));
+  const totals = {
+    week: clients.reduce((n, c) => n + c.leads_7d, 0),
+    all: clients.reduce((n, c) => n + c.leads_total, 0),
+    active: clients.filter((c) => clientActivity(c, now) === "recebendo").length,
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -33,11 +44,24 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
           Cliente &quot;{deleted}&quot; apagado.
         </p>
       )}
-      <IdleAlert clients={idleClients(clients, now)} mode={modeOf("parados")} />
+      <dl className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        {[
+          { label: "Leads nos últimos 7 dias", value: totals.week },
+          { label: "Leads no total", value: totals.all },
+          { label: "Clientes recebendo dados", value: `${totals.active} de ${clients.length}` },
+          { label: "Sem lead novo há +20 h", value: idle.length, warn: idle.length > 0 },
+        ].map((k) => (
+          <div key={k.label} className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
+            <dt className="text-xs text-zinc-500">{k.label}</dt>
+            <dd className={`mt-0.5 text-xl font-semibold tabular-nums ${k.warn ? "text-amber-700" : "text-zinc-900"}`}>{k.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <IdleAlert clients={idle} mode={modeOf("parados")} />
       {infra && <InfraAlert status={evaluateInfra(infra, dbLimitMb())} numbers={infra} mode={modeOf("banco")} />}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Clientes</h1>
-        <Link href="/admin/novo" className={buttonClass()}>
+        <Link href="/admin/novo" className={`${buttonClass()} hidden md:inline-flex`}>
           + Novo cliente
         </Link>
       </div>
@@ -46,43 +70,50 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
       ) : (
         <>
         <ul className="flex flex-col gap-2 md:hidden">
-          {clients.map((c) => {
+          {sorted.map((c) => {
             const activity = clientActivity(c, now);
             return (
               <li key={c.id}>
-                <Link href={`/admin/clientes/${c.id}`} className="block rounded-lg border border-zinc-200 bg-white p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-medium">{c.name}</div>
-                      <div className="text-xs text-zinc-500">
-                        /w/{c.slug}
-                        {isMaster && c.owner_login ? ` · ${c.owner_login}` : ""}
-                      </div>
+                <Link
+                  href={`/admin/clientes/${c.id}`}
+                  className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition active:scale-[0.99] active:bg-zinc-50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`size-2 shrink-0 rounded-full ${ACTIVITY_DOT[activity]}`} title={ACTIVITY_LABEL[activity]} />
+                      <span className="truncate font-medium">{c.name}</span>
                     </div>
-                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs ${activity === "recebendo" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
-                      {ACTIVITY_LABEL[activity]}
-                    </span>
+                    <div className="mt-0.5 truncate text-xs text-zinc-500">
+                      {activity === "recebendo"
+                        ? c.last_lead_at
+                          ? `Último lead ${timeSince(c.last_lead_at, now)}`
+                          : "Recebendo visitas, sem lead ainda"
+                        : ACTIVITY_LABEL[activity]}
+                      {isMaster && c.owner_login ? ` · ${c.owner_login}` : ""}
+                    </div>
+                    <div className="mt-2 flex gap-4 text-xs text-zinc-500">
+                      <span>
+                        <strong className="text-sm font-semibold text-zinc-900 tabular-nums">{c.leads_7d}</strong> em 7 dias
+                      </span>
+                      <span>
+                        <strong className="text-sm font-semibold text-zinc-900 tabular-nums">{c.leads_total}</strong> no total
+                      </span>
+                      {c.without_phone > 0 && (
+                        <span>
+                          <strong className="text-sm font-semibold text-zinc-900 tabular-nums">{c.without_phone}</strong> sem tel.
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <dl className="mt-2 grid grid-cols-3 gap-2 text-xs text-zinc-600">
-                    <div>
-                      <dt>Leads 7 dias</dt>
-                      <dd className="text-sm font-medium text-zinc-900">{c.leads_7d}</dd>
-                    </div>
-                    <div>
-                      <dt>Total</dt>
-                      <dd className="text-sm font-medium text-zinc-900">{c.leads_total}</dd>
-                    </div>
-                    <div>
-                      <dt>Sem telefone</dt>
-                      <dd className="text-sm font-medium text-zinc-900">{c.without_phone}</dd>
-                    </div>
-                  </dl>
+                  <span aria-hidden className="text-xl text-zinc-300">
+                    ›
+                  </span>
                 </Link>
               </li>
             );
           })}
         </ul>
-        <div className="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-white md:block">
+        <div className="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
               <tr>
@@ -94,12 +125,13 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {clients.map((c) => {
+              {sorted.map((c) => {
                 const activity = clientActivity(c, now);
                 return (
                   <tr key={c.id} className="hover:bg-zinc-50">
                     <td className="px-3 py-2">
-                      <Link href={`/admin/clientes/${c.id}`} className="font-medium hover:underline">
+                      <Link href={`/admin/clientes/${c.id}`} className="flex items-center gap-2 font-medium hover:underline">
+                        <span className={`size-2 shrink-0 rounded-full ${ACTIVITY_DOT[activity]}`} />
                         {c.name}
                       </Link>
                       <div className="text-xs text-zinc-500">/w/{c.slug}</div>

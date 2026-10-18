@@ -3,37 +3,40 @@ import { requireAdmin } from "@/lib/admin";
 import { vapidPublicKey } from "@/lib/push";
 import { adminLogout } from "../actions";
 import { AdminPush } from "./admin-push";
+import { NavTabs } from "./nav-tabs";
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const { login, role } = await requireAdmin();
+  const initial = login.trim().charAt(0).toUpperCase() || "?";
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-zinc-800 bg-zinc-900 text-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link href="/admin" className="font-semibold">
-            Lead Hub · Painel mãe
-          </Link>
-          <nav className="flex gap-4 text-sm text-zinc-300">
-            <Link href="/admin" className="hover:text-white">
-              Clientes
+      <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-900/95 text-white backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 pt-3 md:flex-row md:items-center md:gap-6 md:pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/admin" className="flex items-center gap-2 font-semibold">
+              <span className="grid size-7 place-items-center rounded-lg bg-emerald-500 text-sm text-zinc-900">L</span>
+              <span>
+                Lead Hub <span className="font-normal text-zinc-400">· Painel mãe</span>
+              </span>
             </Link>
-            <Link href="/admin/leads" className="hover:text-white">
-              Leads
-            </Link>
-            <Link href="/admin/novo" className="hover:text-white">
-              Novo cliente
-            </Link>
-            {role === "master" && (
-              <Link href="/admin/gestores" className="hover:text-white">
-                Gestores
+            <div className="flex items-center gap-2 md:hidden">
+              <AdminPush vapidKey={vapidPublicKey()} master={role === "master"} />
+              <Link
+                href="/admin/conta"
+                title={`${login} (${role})`}
+                className="grid size-8 place-items-center rounded-full bg-zinc-700 text-sm font-medium"
+              >
+                {initial}
               </Link>
-            )}
-          </nav>
-          <div className="ml-auto flex items-center gap-3 text-sm text-zinc-300">
+            </div>
+          </div>
+          <NavTabs master={role === "master"} />
+          <div className="ml-auto hidden items-center gap-3 text-sm text-zinc-300 md:flex">
             <AdminPush vapidKey={vapidPublicKey()} master={role === "master"} />
-            <Link href="/admin/conta" className="hover:text-white" title="Minha conta">
-              {login}
-              <span className="ml-1.5 rounded bg-zinc-700 px-1.5 py-0.5 text-xs">{role === "master" ? "master" : "gestor"}</span>
+            <Link href="/admin/conta" className="flex items-center gap-2 hover:text-white" title="Minha conta">
+              <span className="grid size-7 place-items-center rounded-full bg-zinc-700 text-xs font-medium text-white">{initial}</span>
+              <span className="max-w-48 truncate">{login}</span>
+              <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-xs">{role === "master" ? "master" : "gestor"}</span>
             </Link>
             <form action={adminLogout}>
               <button className="hover:text-white hover:underline">Sair</button>

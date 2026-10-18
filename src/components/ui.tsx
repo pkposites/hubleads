@@ -39,7 +39,7 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
 
 export function Card({ title, actions, children, className }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cx("rounded-lg border border-zinc-200 bg-white", className)}>
+    <section className={cx("rounded-xl border border-zinc-200 bg-white", className)}>
       {(title || actions) && (
         <header className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3">
           <h2 className="text-sm font-semibold text-zinc-900">{title}</h2>

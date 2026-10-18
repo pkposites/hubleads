@@ -1,5 +1,6 @@
-import { Card } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
 import { requireAdmin } from "@/lib/admin";
+import { adminLogout } from "../../actions";
 import { PasswordForm } from "./password-form";
 
 export default async function AccountPage() {
@@ -18,6 +19,11 @@ export default async function AccountPage() {
       <Card title="Trocar senha">
         <PasswordForm login={login} />
       </Card>
+      <form action={adminLogout}>
+        <Button variant="secondary" className="w-full sm:w-auto">
+          Sair deste aparelho
+        </Button>
+      </form>
     </div>
   );
 }

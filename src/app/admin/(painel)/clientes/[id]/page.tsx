@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { Button, Card, EmptyState } from "@/components/ui";
@@ -37,30 +38,37 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
   const { id } = await params;
   const { token, role } = await requireAdmin();
 
-  let client: ClientSummary;
-  try {
-    client = await call<ClientSummary>("lh_admin_workspace", { p_token: token, p_workspace_id: id });
-  } catch (error) {
-    if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) notFound();
-    throw error;
-  }
-  const [events, meta, pixels, privacy, leadForms, sources, googleAds] = await Promise.all([
-    call<LeadEvent[]>("lh_admin_list_events", { p_token: token, p_workspace_id: id, p_limit: 50 }),
-    call<MetaSettingsData>("lh_admin_get_meta", { p_token: token, p_workspace_id: id }),
-    call<{ pixel_id: string; last_seen: string }[]>("lh_admin_lp_pixels", { p_token: token, p_workspace_id: id }),
-    call<PrivacyData>("lh_admin_get_privacy", { p_token: token, p_workspace_id: id }),
-    call<LeadFormsData>("lh_admin_get_lead_forms", { p_token: token, p_workspace_id: id }),
-    call<SheetSource[]>("lh_admin_list_sources", { p_token: token, p_workspace_id: id }),
-    call<GoogleAdsSettings | null>("lh_admin_get_google_ads", { p_token: token, p_workspace_id: id }),
+  // Everything at once: each call is a round trip to the database.
+  const args = { p_token: token, p_workspace_id: id };
+  // Unknown or someone else's client: every call answers "not found" the same way.
+  const found = <T,>(promise: Promise<T>) =>
+    promise.catch((error) => {
+      if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) return null;
+      throw error;
+    });
+  const [client, eventList, meta, pixelList, privacy, leadForms, sourceList, googleAds, admins, origin] = await Promise.all([
+    found(call<ClientSummary>("lh_admin_workspace", args)),
+    found(call<LeadEvent[]>("lh_admin_list_events", { ...args, p_limit: 50 })),
+    found(call<MetaSettingsData>("lh_admin_get_meta", args)),
+    found(call<{ pixel_id: string; last_seen: string }[]>("lh_admin_lp_pixels", args)),
+    found(call<PrivacyData>("lh_admin_get_privacy", args)),
+    found(call<LeadFormsData>("lh_admin_get_lead_forms", args)),
+    found(call<SheetSource[]>("lh_admin_list_sources", args)),
+    found(call<GoogleAdsSettings | null>("lh_admin_get_google_ads", args)),
+    role === "master" ? call<AdminUser[]>("lh_admin_list_admins", { p_token: token }) : Promise.resolve([] as AdminUser[]),
+    appOrigin(),
   ]);
-  const origin = await appOrigin();
-  const gestores =
-    role === "master"
-      ? (await call<AdminUser[]>("lh_admin_list_admins", { p_token: token })).filter((a) => a.role === "gestor" && a.active)
-      : [];
+  if (!client || !meta || !privacy || !leadForms) notFound();
+  const events = eventList ?? [];
+  const pixels = pixelList ?? [];
+  const sources = sourceList ?? [];
+  const gestores = admins.filter((a) => a.role === "gestor" && a.active);
 
   return (
     <div className="flex flex-col gap-4">
+      <Link href="/admin" className="-mb-2 self-start text-sm text-zinc-500 hover:text-zinc-900">
+        ‹ Clientes
+      </Link>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">{client.name}</h1>

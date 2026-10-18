@@ -44,8 +44,8 @@ export function DismissibleAlert({
   if (mode === "hide") return null;
   if (mode === "min") {
     return (
-      <section className={`flex items-center justify-between gap-3 rounded-lg border px-4 py-2 text-sm ${TONE[tone]}`}>
-        <span className="min-w-0 truncate font-medium">{title}</span>
+      <section className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm ${TONE[tone]}`}>
+        <span className="line-clamp-2 min-w-0 font-medium leading-snug">{title}</span>
         <span className="flex shrink-0 items-center gap-3 text-xs">
           <button type="button" className="font-medium hover:underline" onClick={() => choose("open")}>
             Mostrar
@@ -58,8 +58,8 @@ export function DismissibleAlert({
     );
   }
   return (
-    <section className={`rounded-lg border p-4 text-sm ${TONE[tone]}`} role={tone === "neutral" ? undefined : "alert"}>
-      <div className="flex items-start justify-between gap-3">
+    <section className={`rounded-xl border p-4 text-sm ${TONE[tone]}`} role={tone === "neutral" ? undefined : "alert"}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <h2 className="font-semibold">{title}</h2>
         <span className="flex shrink-0 items-center gap-3 text-xs">
           <button type="button" className="font-medium hover:underline" onClick={() => choose("min")}>
