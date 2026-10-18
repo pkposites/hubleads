@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { currentAdmin } from "@/lib/admin";
 import { currentSession } from "@/lib/session";
+import { FlowDemo } from "./flow-demo";
 import { LandingVideo, Reveal } from "./landing-motion";
 import { LoginForm } from "./login-form";
+import { SignupForm } from "./signup-form";
 
 // Presentation for visitors; the installed app (standalone) shows only the login.
 const page = "[@media(display-mode:standalone)]:hidden";
@@ -27,6 +29,33 @@ const STEPS = [
   { n: "2", title: "Aviso na hora", text: "O celular da equipe apita a cada lead novo, mesmo com o app fechado. Quem responde primeiro, vende primeiro." },
   { n: "3", title: "A equipe atende e marca", text: "Novo, em atendimento, agendado, venda (com o valor) e uma cor de qualidade: bom, médio ou ruim." },
   { n: "4", title: "As vendas voltam para os anúncios", text: "Agendamentos e vendas vão para a Meta e o Google Ads. Os anúncios aprendem quem compra e trazem mais gente parecida." },
+];
+
+const NEEDS = [
+  {
+    title: "Anúncios que levam a uma página com botão de WhatsApp",
+    text: "Ou formulário instantâneo da Meta, ou uma planilha do Google. É por onde o lead entra.",
+  },
+  {
+    title: "Acesso para colar um código na página",
+    text: "Você, quem fez o site ou o Claude Code da página. Mandamos o passo a passo pronto.",
+  },
+  {
+    title: "Pixel da Meta e Google Ads com acesso de administrador",
+    text: "Para devolver agendamentos e vendas aos anúncios. No Google, a codificação automática ligada (já vem assim).",
+  },
+  {
+    title: "Alguém da equipe marcando Agendado e Venda",
+    text: "Leva segundos por lead, e é isso que ensina os anúncios a trazer quem compra.",
+  },
+  {
+    title: "Um celular para receber os avisos",
+    text: "O Cadê o Lead instala na tela inicial como um app e avisa a cada lead novo.",
+  },
+  {
+    title: "Política de privacidade (LGPD)",
+    text: "Não precisa ter: o Cadê o Lead gera uma para cada cliente, com o aviso de cookies na página.",
+  },
 ];
 
 const WORKS = [
@@ -57,9 +86,14 @@ export default async function Home() {
           <a href="#topo" className="text-lg font-bold tracking-tight">
             CL<span className="text-emerald-400">.</span> <span className="font-medium text-zinc-300">Cadê o Lead</span>
           </a>
-          <a href="#entrar" className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-zinc-900 transition hover:bg-emerald-300">
-            Entrar
-          </a>
+          <div className="flex items-center gap-2">
+            <a href="#entrar" className="rounded-full px-3 py-1.5 text-sm font-medium text-zinc-300 transition hover:text-white">
+              Entrar
+            </a>
+            <a href="#cadastro" className="rounded-full bg-emerald-400 px-4 py-1.5 text-sm font-semibold text-zinc-900 transition hover:bg-emerald-300">
+              Quero usar
+            </a>
+          </div>
         </div>
       </header>
 
@@ -69,29 +103,31 @@ export default async function Home() {
             aria-hidden
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.18),transparent_55%),radial-gradient(circle,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:auto,22px_22px]"
           />
-          <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-14 md:grid-cols-[1.1fr_1fr] md:py-20">
-            <Reveal>
+          <div className="relative mx-auto grid max-w-6xl items-center gap-x-12 gap-y-8 px-4 py-12 md:grid-cols-[1.1fr_1fr] md:py-20">
+            <Reveal className="md:self-end">
               <p className="mb-4 inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">
                 Anúncio na Meta, no Google, WhatsApp, planilha… e aí, cadê o lead?
               </p>
               <h1 className="text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl">
                 Do anúncio à venda, você sabe <span className="text-emerald-400">onde está cada lead.</span>
               </h1>
-              <p className="mt-5 max-w-xl text-lg text-zinc-300">
+            </Reveal>
+            <Reveal delay={150} className="flex justify-center md:col-start-2 md:row-span-2 md:row-start-1">
+              <FlowDemo />
+            </Reveal>
+            <Reveal delay={250} className="md:self-start">
+              <p className="max-w-xl text-lg text-zinc-300">
                 O Cadê o Lead junta numa planilha só os contatos que chegam dos seus anúncios, avisa no celular na hora e devolve as
                 vendas para a Meta e o Google, para as campanhas trazerem mais gente que compra.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <a href="#como-funciona" className="rounded-full bg-emerald-400 px-5 py-2.5 font-semibold text-zinc-900 transition hover:bg-emerald-300">
-                  Ver como funciona
+                <a href="#cadastro" className="rounded-full bg-emerald-400 px-5 py-2.5 font-semibold text-zinc-900 transition hover:bg-emerald-300">
+                  Quero usar
                 </a>
-                <a href="#entrar" className="rounded-full border border-white/20 px-5 py-2.5 font-semibold transition hover:bg-white/10">
-                  Já sou cliente
+                <a href="#precisa" className="rounded-full border border-white/20 px-5 py-2.5 font-semibold transition hover:bg-white/10">
+                  O que preciso ter?
                 </a>
               </div>
-            </Reveal>
-            <Reveal delay={150}>
-              <LandingVideo />
             </Reveal>
           </div>
         </section>
@@ -110,6 +146,28 @@ export default async function Home() {
               </Reveal>
             ))}
           </div>
+        </section>
+
+        <section id="precisa" className={`scroll-mt-16 mx-auto max-w-6xl px-4 py-14 ${page}`}>
+          <Reveal>
+            <h2 className="text-2xl font-bold sm:text-3xl">O que você precisa ter para funcionar bem</h2>
+            <p className="mt-2 max-w-2xl text-zinc-400">Nada de sistema novo para a equipe aprender: é colar um código e atender pelo celular.</p>
+          </Reveal>
+          <ul className="mt-8 grid gap-3 md:grid-cols-2">
+            {NEEDS.map((n, i) => (
+              <Reveal key={n.title} delay={i * 80}>
+                <li className="flex h-full gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-emerald-400 text-sm font-bold text-zinc-900" aria-hidden>
+                    ✓
+                  </span>
+                  <div>
+                    <p className="font-medium">{n.title}</p>
+                    <p className="mt-1 text-sm text-zinc-400">{n.text}</p>
+                  </div>
+                </li>
+              </Reveal>
+            ))}
+          </ul>
         </section>
 
         <section id="como-funciona" className={`scroll-mt-16 border-y border-white/5 bg-white/[0.02] ${page}`}>
@@ -180,6 +238,30 @@ export default async function Home() {
           </Reveal>
         </section>
 
+        <section className={`border-y border-white/5 bg-white/[0.02] ${page}`}>
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 md:grid-cols-2">
+            <Reveal>
+              <h2 className="text-2xl font-bold sm:text-3xl">Assista em 30 segundos</h2>
+              <p className="mt-2 text-zinc-400">Do anúncio à venda, com o painel que a agência e a equipe usam todo dia.</p>
+            </Reveal>
+            <Reveal delay={120}>
+              <LandingVideo />
+            </Reveal>
+          </div>
+        </section>
+
+        <section id="cadastro" className={`scroll-mt-16 mx-auto max-w-3xl px-4 py-16 ${page}`}>
+          <Reveal>
+            <h2 className="text-center text-3xl font-bold">Quero usar o Cadê o Lead</h2>
+            <p className="mx-auto mt-2 max-w-xl text-center text-zinc-400">
+              Conte como seus leads chegam hoje. A gente chama no WhatsApp, confere se funciona para o seu caso e deixa tudo instalado.
+            </p>
+          </Reveal>
+          <Reveal delay={100} className="mt-8 rounded-3xl border border-white/10 bg-[#121614] p-5 sm:p-8">
+            <SignupForm />
+          </Reveal>
+        </section>
+
         <section
           id="entrar"
           className="scroll-mt-16 px-4 py-14 [@media(display-mode:standalone)]:flex [@media(display-mode:standalone)]:min-h-dvh [@media(display-mode:standalone)]:items-center [@media(display-mode:standalone)]:justify-center"
@@ -188,7 +270,7 @@ export default async function Home() {
             <p className="text-lg font-bold tracking-tight">
               CL<span className="text-emerald-500">.</span> Cadê o Lead
             </p>
-            <p className="mb-5 text-sm text-zinc-600">Entre com o endereço da sua empresa e a senha que você recebeu.</p>
+            <p className="mb-5 text-sm text-zinc-600">Já é cliente? Entre com o endereço da sua empresa e a senha que você recebeu.</p>
             <LoginForm />
             <a href="/admin" className="mt-4 block text-center text-xs text-zinc-500 hover:underline">
               Acesso do administrador (painel da agência)

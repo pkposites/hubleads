@@ -9,6 +9,7 @@ import { formatDateTime, timeSince } from "@/lib/format";
 import { dbLimitMb, evaluateInfra, type InfraNumbers } from "@/lib/infra";
 import { IdleAlert } from "./idle-alert";
 import { InfraAlert } from "./infra-alert";
+import { Signups, type Signup } from "./signups";
 
 const ACTIVITY_DOT = { recebendo: "bg-emerald-500", parado: "bg-amber-500", aguardando: "bg-zinc-300" } as const;
 
@@ -16,9 +17,10 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   const { token, role } = await requireAdmin();
   const deleted = (await searchParams).apagado;
   const isMaster = role === "master";
-  const [clients, infra] = await Promise.all([
+  const [clients, infra, signups] = await Promise.all([
     call<ClientSummary[]>("lh_admin_list_workspaces", { p_token: token }),
     isMaster ? call<InfraNumbers>("lh_admin_infra", { p_token: token }).catch(() => null) : null,
+    isMaster ? call<Signup[]>("lh_admin_list_signups", { p_token: token }).catch(() => [] as Signup[]) : ([] as Signup[]),
   ]);
   // Alerts the admin minimised or hid (only while they say the same thing).
   const store = await cookies();
@@ -57,6 +59,7 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
           </div>
         ))}
       </dl>
+      <Signups signups={signups} />
       <IdleAlert clients={idle} mode={modeOf("parados")} />
       {infra && <InfraAlert status={evaluateInfra(infra, dbLimitMb())} numbers={infra} mode={modeOf("banco")} />}
       <div className="flex items-center justify-between">

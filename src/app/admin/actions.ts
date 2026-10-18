@@ -610,3 +610,10 @@ export async function updateGoogleAds(
     return { error: "Não foi possível salvar." };
   }
 }
+
+/** Home page sign-up request: contacted or back to new (master only). */
+export async function markSignup(signupId: string, contacted: boolean) {
+  const { token } = await requireAdmin();
+  await call("lh_admin_mark_signup", { p_token: token, p_signup_id: signupId, p_contacted: contacted });
+  revalidatePath("/admin");
+}

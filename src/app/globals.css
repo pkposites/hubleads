@@ -22,3 +22,19 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Home page walk-through (src/app/flow-demo.tsx). */
+@keyframes lh-pop { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes lh-slide { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+@keyframes lh-drop { from { opacity: 0; transform: translateY(-18px); } to { opacity: 1; transform: none; } }
+@keyframes lh-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+@keyframes lh-click {
+  0% { opacity: 0; transform: translate(40px, 30px); }
+  50% { opacity: 1; transform: translate(0, 0); }
+  62% { transform: translate(0, 0) scale(.82); }
+  75%, 100% { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+@keyframes lh-fly { from { opacity: 0; transform: translateX(-30px); } 40% { opacity: 1; } to { opacity: 0; transform: translateX(70px); } }
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-[lh-"] { animation: none !important; }
+}
