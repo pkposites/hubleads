@@ -22,6 +22,7 @@ import type { PrivacySettings as PrivacyData } from "@/lib/privacy";
 const TYPE_LABEL: Record<string, string> = {
   page_view: "Visita",
   whatsapp_click: "Clique no WhatsApp",
+  form_submit: "Formulário enviado",
   identify: "Contato informado",
 };
 

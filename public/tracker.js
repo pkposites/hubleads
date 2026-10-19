@@ -16,6 +16,11 @@
  *   LeadHub.set({ pergunta: "resposta" }) -> answers (e.g. a quiz) sent with the click
  *   LeadHub.identify({ name, phone })    -> contact typed on the page, sent with the click
  *   LeadHub.track("evento", { value })   -> records any other event
+ *   LeadHub.submit({ name, phone, email }) -> a form was sent: creates the lead
+ *
+ * Pages with a form instead of a WhatsApp button work too: a form sent with a
+ * phone field (or the page's own Lead event with a phone typed on the page)
+ * becomes a row, like a WhatsApp click.
  *
  * Also records the commercial events the page already fires through the Meta
  * pixel or Google Tag Manager (Lead, Contact, Schedule, Purchase...), without
@@ -210,7 +215,7 @@
 
   // --- sending -------------------------------------------------------------
   function send(event) {
-    if (!tracking && event.type !== "whatsapp_click" && event.type !== "identify") return;
+    if (!tracking && event.type !== "whatsapp_click" && event.type !== "form_submit" && event.type !== "identify") return;
     event.key = KEY;
     event.visitor_id = visitorId;
     event.url = window.location.href.split("#")[0];
@@ -220,7 +225,7 @@
       event.url_params = urlParams;
     }
     if (CONSENT_MODE) event.consent = tracking;
-    if (CONSENT_MODE && !tracking && event.type === "whatsapp_click") event.minimal = minimal();
+    if (CONSENT_MODE && !tracking && (event.type === "whatsapp_click" || event.type === "form_submit")) event.minimal = minimal();
     post(event);
   }
 
@@ -355,6 +360,57 @@
     });
   }
 
+  // A form sent (no WhatsApp in between): the lead comes with what was typed.
+  var lastForm = 0;
+  function recordForm(info) {
+    info = info || {};
+    var now = Date.now();
+    // The same person already counted by a click or by this form a moment ago.
+    if (now - lastForm < 10000 || now - lastClick < 10000) return;
+    var name = String(info.name || contact.name || nameOnPage() || "").trim().slice(0, 120);
+    var phone = String(info.phone || contact.phone || phoneOnPage() || "").trim().slice(0, 40);
+    if (phone.replace(/\D/g, "").length < 10) return;
+    lastForm = now;
+    var data = { via: "formulario" };
+    var email = String(info.email || emailOnPage() || "").trim().slice(0, 200);
+    if (email) data.email = email;
+    for (var k in answers) data[k] = answers[k];
+    send({
+      type: "form_submit",
+      code: codeEnabled() ? code() : undefined,
+      name: name || undefined,
+      phone: phone,
+      data: data,
+    });
+  }
+
+  function fieldIn(form, selector, max) {
+    var inputs = form.querySelectorAll(selector);
+    for (var i = 0; i < inputs.length; i++) {
+      var v = inputs[i].value && inputs[i].value.trim();
+      if (v) return v.slice(0, max);
+    }
+    return undefined;
+  }
+  var NAME_FIELDS = 'input[name="nome" i], input[name="name" i], input[name*="nome" i], input[id*="nome" i], input[autocomplete="name"]';
+  var PHONE_FIELDS = 'input[type="tel"], input[name*="telefone" i], input[name*="phone" i], input[name*="whats" i], input[name*="celular" i], input[autocomplete="tel"]';
+  var EMAIL_FIELDS = 'input[type="email"], input[name*="email" i], input[autocomplete="email"]';
+  function emailOnPage() {
+    return fieldOnPage(EMAIL_FIELDS, 200);
+  }
+
+  document.addEventListener(
+    "submit",
+    function (e) {
+      var form = e.target;
+      if (!form || !form.querySelectorAll) return;
+      var phone = fieldIn(form, PHONE_FIELDS, 40);
+      if (!phone) return;
+      recordForm({ name: fieldIn(form, NAME_FIELDS, 120), phone: phone, email: fieldIn(form, EMAIL_FIELDS, 200) });
+    },
+    true
+  );
+
   function isWhatsApp(url) {
     return typeof url === "string" && WHATSAPP_RE.test(url);
   }
@@ -415,6 +471,7 @@
     schedule: "Schedule",
     subscribe: "Subscribe",
   };
+  var FORM_EVENTS = /^(Lead|CompleteRegistration|SubmitApplication)$/;
   var lastEvent = {};
   var eventCount = 0;
   function pageEvent(name, source, params) {
@@ -434,6 +491,8 @@
       });
     }
     send({ type: "lp_event", data: data });
+    // The page's own "lead sent" event: a form without WhatsApp (needs a phone typed on the page).
+    if (FORM_EVENTS.test(name)) recordForm();
   }
 
   function pixelRequest(url) {
@@ -484,6 +543,14 @@
       session("lh_contact", JSON.stringify(contact));
       // Also updates a row created by an earlier click of this visitor.
       if (contact.name || contact.phone) send({ type: "identify", name: contact.name, phone: contact.phone });
+    },
+    submit: function (info) {
+      if (info && typeof info === "object") {
+        if (info.name) contact.name = String(info.name).trim().slice(0, 120);
+        if (info.phone) contact.phone = String(info.phone).trim().slice(0, 40);
+      }
+      lastForm = 0;
+      recordForm(info);
     },
     track: function (type, data) {
       pageEvent(type, "api", data);

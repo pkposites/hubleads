@@ -466,6 +466,32 @@ describe("tracker.js", () => {
       expect(layer).toHaveLength(5);
     });
 
+    it("turns the page's Lead event into a lead when a phone is typed (page with a form)", async () => {
+      const { sent, flush } = load("/");
+      const tel = document.createElement("input");
+      tel.type = "tel";
+      tel.value = "(11) 91234-5678";
+      document.body.appendChild(tel);
+      pixel("https://www.facebook.com/tr/?id=1&ev=Lead");
+      await flush();
+      const form = sent.filter((e) => e.type === "form_submit");
+      expect(form).toHaveLength(1);
+      expect(form[0]).toMatchObject({ phone: "(11) 91234-5678", data: { via: "formulario" } });
+    });
+
+    it("does not duplicate a WhatsApp click followed by the page's Lead event", async () => {
+      const { sent, flush } = load("/");
+      const tel = document.createElement("input");
+      tel.type = "tel";
+      tel.value = "11 91234-5678";
+      document.body.appendChild(tel);
+      whatsappLink("https://wa.me/5511999999999").click();
+      pixel("https://www.facebook.com/tr/?id=1&ev=Lead");
+      await flush();
+      expect(sent.filter((e) => e.type === "whatsapp_click")).toHaveLength(1);
+      expect(sent.filter((e) => e.type === "form_submit")).toHaveLength(0);
+    });
+
     it("counts an event sent by both the pixel and GTM once", async () => {
       (window as unknown as { dataLayer: unknown[] }).dataLayer = [{ event: "Contact" }];
       const { sent, flush } = load("/");
@@ -482,6 +508,37 @@ describe("tracker.js", () => {
       await new Promise((r) => setTimeout(r, 1100));
       expect(events(sent)).toEqual([{ event: "Schedule", source: "gtm" }]);
     });
+  });
+
+  it("creates the lead when a form with a phone is sent (page without WhatsApp)", async () => {
+    const { sent, flush } = load("/?utm_source=facebook");
+    const form = document.createElement("form");
+    form.innerHTML = '<input name="nome" value="Bia"><input type="tel" name="telefone" value="11 98888-7777"><input type="email" name="email" value="bia@x.com">';
+    form.addEventListener("submit", (e) => e.preventDefault());
+    document.body.appendChild(form);
+    form.requestSubmit();
+    form.requestSubmit(); // double tap: one row
+    await flush();
+    const leads = sent.filter((e) => e.type === "form_submit");
+    expect(leads).toHaveLength(1);
+    expect(leads[0]).toMatchObject({ name: "Bia", phone: "11 98888-7777", data: { via: "formulario", email: "bia@x.com" }, attribution: { utm_source: "facebook" } });
+
+    // A form without a phone is not a lead.
+    const other = load("/");
+    const search = document.createElement("form");
+    search.innerHTML = '<input name="busca" value="implante">';
+    search.addEventListener("submit", (e) => e.preventDefault());
+    document.body.appendChild(search);
+    search.requestSubmit();
+    await other.flush();
+    expect(other.sent.filter((e) => e.type === "form_submit")).toEqual([]);
+  });
+
+  it("offers LeadHub.submit for pages that send the form in their own code", async () => {
+    const { sent, flush } = load("/");
+    (window as unknown as { LeadHub: { submit(i: object): void } }).LeadHub.submit({ name: "Caio", phone: "21 97777-6666" });
+    await flush();
+    expect(sent.find((e) => e.type === "form_submit")).toMatchObject({ name: "Caio", phone: "21 97777-6666" });
   });
 
   it("sends quiz answers with the click", async () => {
