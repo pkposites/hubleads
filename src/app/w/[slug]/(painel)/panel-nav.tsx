@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-export function PanelNav({ slug, queue }: { slug: string; queue: number }) {
+/** Sections of the client's panel; "Integrações" only when the client lets attendants configure them. */
+export function PanelNav({ slug, queue, integrations }: { slug: string; queue: number; integrations?: () => Promise<void> }) {
   const pathname = usePathname();
   // The tapped tab lights up at once, before the page arrives.
   const [tapped, setTapped] = useState<{ href: string; from: string } | null>(null);
@@ -39,6 +40,13 @@ export function PanelNav({ slug, queue }: { slug: string; queue: number }) {
           </Link>
         );
       })}
+      {integrations && (
+        <form action={integrations}>
+          <button className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-100 active:scale-95 sm:py-1.5">
+            Integrações
+          </button>
+        </form>
+      )}
     </nav>
   );
 }

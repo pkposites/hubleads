@@ -15,7 +15,8 @@ import { Signups, type Signup } from "./signups";
 const ACTIVITY_DOT = { recebendo: "bg-emerald-500", parado: "bg-amber-500", aguardando: "bg-zinc-300" } as const;
 
 export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
-  const { token, role } = await requireAdmin();
+  const { token, role, team } = await requireAdmin();
+  if (team) redirect(`/admin/clientes/${team.id}`);
   const deleted = (await searchParams).apagado;
   const isMaster = role === "master";
   const [clients, infra, signups] = await Promise.all([

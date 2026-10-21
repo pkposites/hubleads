@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Badge, buttonClass, controlClass, EmptyState } from "@/components/ui";
 import { requireAdmin } from "@/lib/admin";
@@ -38,7 +39,8 @@ const statusTone = (status: string) => (status === "venda" ? "good" : status ===
 
 /** Every lead of the admin's clients in one list (read-only; changes happen in each client's panel). */
 export default async function AllLeadsPage({ searchParams }: PageProps<"/admin/leads">) {
-  const { token } = await requireAdmin();
+  const { token, team } = await requireAdmin();
+  if (team) redirect(`/admin/clientes/${team.id}`);
   const params = await searchParams;
   const one = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : "");
   const search = one("busca").trim().slice(0, 100);

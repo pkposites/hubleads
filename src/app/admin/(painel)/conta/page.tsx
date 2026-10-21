@@ -1,10 +1,12 @@
+import { redirect } from "next/navigation";
 import { Button, Card } from "@/components/ui";
 import { requireAdmin } from "@/lib/admin";
 import { adminLogout } from "../../actions";
 import { PasswordForm } from "./password-form";
 
 export default async function AccountPage() {
-  const { login, role } = await requireAdmin();
+  const { login, role, team } = await requireAdmin();
+  if (team) redirect(`/admin/clientes/${team.id}`);
   return (
     <div className="flex max-w-lg flex-col gap-4">
       <h1 className="text-lg font-semibold">Minha conta</h1>

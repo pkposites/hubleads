@@ -400,6 +400,17 @@ export async function addMember(workspaceId: string, _prev: MemberState, formDat
   }
 }
 
+export async function setTeamAccess(workspaceId: string, enabled: boolean): Promise<{ error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    await call("lh_admin_set_team_access", { p_token: token, p_workspace_id: workspaceId, p_enabled: enabled });
+    revalidatePath(`/admin/clientes/${workspaceId}`);
+    return {};
+  } catch {
+    return { error: "Não foi possível salvar." };
+  }
+}
+
 export async function resetMemberPassword(workspaceId: string, adminId: string): Promise<{ password?: string; error?: string }> {
   const { token } = await requireAdmin();
   try {

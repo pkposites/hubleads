@@ -13,6 +13,7 @@ import { normalizePhone } from "@/lib/normalize";
 import type { SheetColumn } from "@/lib/sheet-columns";
 import { loginClient, lockedMessage } from "@/lib/server";
 import { requireWorkspace, SESSION_COOKIE } from "@/lib/session";
+import { ADMIN_COOKIE, currentAdmin } from "@/lib/admin";
 
 export type FormState = { error?: string; ok?: string; slug?: string } | undefined;
 
@@ -46,6 +47,32 @@ export async function logout(slug: string) {
   if (token) await call("lh_logout", { p_token: token }).catch(() => undefined);
   store.delete(SESSION_COOKIE);
   redirect(`/w/${slug}/entrar`);
+}
+
+/**
+ * "Integrações" tab of the sheet. An admin already logged in on this browser
+ * just goes to the client's page; an attendant opens it as the client's team
+ * account (only when the client allows it), for 8 hours.
+ */
+export async function openIntegrations(slug: string) {
+  const { token, workspace } = await requireWorkspace(slug);
+  const admin = await currentAdmin();
+  if (admin && !admin.team) redirect(`/admin/clientes/${workspace.id}`);
+  let opened: { token: string; workspace_id: string };
+  try {
+    opened = await call("lh_session_open_integrations", { p_token: token });
+  } catch (error) {
+    if (error instanceof DbError && error.code === "LH403") redirect(`/w/${slug}`);
+    throw error;
+  }
+  (await cookies()).set(ADMIN_COOKIE, opened.token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 8,
+  });
+  redirect(`/admin/clientes/${opened.workspace_id}`);
 }
 
 export type EditableField = "name" | "phone" | "status" | "notes" | "sale_value" | "next_contact_at" | "stage" | "color";

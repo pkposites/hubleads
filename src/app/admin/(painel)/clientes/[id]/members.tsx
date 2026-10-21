@@ -4,7 +4,7 @@ import { useActionState, useState, useTransition } from "react";
 import { Button, Field, FormMessage, inputClass } from "@/components/ui";
 import { CopyButton } from "@/components/copy-button";
 import { formatDateTime } from "@/lib/format";
-import { addMember, removeMember, resetMemberPassword } from "../../../actions";
+import { addMember, removeMember, resetMemberPassword, setTeamAccess } from "../../../actions";
 
 export interface Member {
   id: string;
@@ -60,6 +60,49 @@ export function Members({ workspaceId, client, origin, members }: { workspaceId:
             {state.created.login} já tinha acesso ao Cadê o Lead: agora vê também este cliente, com a mesma senha.
           </p>
         ))}
+    </div>
+  );
+}
+
+/** Lets the client's attendants open the integrations from the sheet, with their password. */
+export function TeamAccess({ workspaceId, enabled }: { workspaceId: string; enabled: boolean }) {
+  const [on, setOn] = useState(enabled);
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          className="mt-0.5 size-5"
+          checked={on}
+          disabled={pending}
+          onChange={(e) => {
+            const next = e.target.checked;
+            if (next && !window.confirm("Liberar as integrações para quem tem a senha do atendente deste cliente?")) return;
+            setOn(next);
+            start(async () => {
+              const result = await setTeamAccess(workspaceId, next);
+              if (result.error) setOn(!next);
+              setError(result.error ?? null);
+            });
+          }}
+        />
+        <span>
+          <span className="font-medium">Atendentes podem configurar as integrações</span>
+          <span className="block text-zinc-600">
+            Quem entra com a senha do atendente ganha a aba <strong>Integrações</strong> na planilha: cadastra Landing Pages e pega o código e o
+            prompt de instalação, coloca o Pixel e o token da Meta, conecta formulários, planilhas e Google Ads. Só deste cliente: nunca vê
+            seus outros clientes. Não troca a senha do atendente nem dá acesso a ninguém. Desligar fecha na hora.
+          </span>
+        </span>
+      </label>
+      {on && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
+          Qualquer pessoa com a senha do atendente pode mudar Pixel e token. Para saber quem mudou, prefira dar acesso por e-mail abaixo.
+        </p>
+      )}
+      {error && <p className="text-red-700">{error}</p>}
     </div>
   );
 }

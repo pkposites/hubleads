@@ -4,7 +4,7 @@ import type { Template } from "@/lib/leads";
 import { vapidPublicKey } from "@/lib/push";
 import { requireWorkspace } from "@/lib/session";
 import { resolveColumns, type SheetConfig } from "@/lib/sheet-columns";
-import { logout } from "../actions";
+import { logout, openIntegrations } from "../actions";
 import { AutoRefresh } from "./auto-refresh";
 import { NewLeadAlert } from "./new-lead-alert";
 import { PanelProvider } from "./panel-context";
@@ -51,7 +51,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
               </form>
             </div>
             <div className="-mx-3 w-[calc(100%+1.5rem)] overflow-x-auto px-3 sm:mx-0 sm:w-auto sm:px-0">
-              <PanelNav slug={slug} queue={counts.due} />
+              <PanelNav slug={slug} queue={counts.due} integrations={workspace.configure && !asAdmin ? openIntegrations.bind(null, slug) : undefined} />
             </div>
           </div>
         </header>

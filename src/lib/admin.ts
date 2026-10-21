@@ -37,12 +37,19 @@ export interface AdminUser {
   last_login_at: string | null;
 }
 
-export const currentAdmin = cache(async (): Promise<{ token: string; login: string; role: AdminRole } | null> => {
+/** The client of a team account (integrations opened from the sheet with the attendant password). */
+export interface TeamClient {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export const currentAdmin = cache(async (): Promise<{ token: string; login: string; role: AdminRole; team: TeamClient | null } | null> => {
   const token = (await cookies()).get(ADMIN_COOKIE)?.value;
   if (!token) return null;
   try {
-    const admin = await call<{ login: string; role: AdminRole }>("lh_admin_session", { p_token: token });
-    return { token, login: admin.login, role: admin.role };
+    const admin = await call<{ login: string; role: AdminRole; team?: TeamClient | null }>("lh_admin_session", { p_token: token });
+    return { token, login: admin.login, role: admin.role, team: admin.team ?? null };
   } catch (error) {
     if (error instanceof DbError && error.code === "LH401") return null;
     throw error;

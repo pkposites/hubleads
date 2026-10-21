@@ -12,6 +12,8 @@ export interface Workspace {
   slug: string;
   /** "atendente" (client password) or "admin" (opened from the admin panel). */
   role: "atendente" | "admin";
+  /** The client lets its attendants configure the integrations. */
+  configure?: boolean;
 }
 
 /** The workspace of the current session, or null when there is none. */

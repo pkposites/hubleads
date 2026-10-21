@@ -17,7 +17,7 @@ import { PrivacySettings } from "./privacy-settings";
 import { LeadForms, type LeadFormsData } from "./lead-forms";
 import { SheetSources, type SheetSource } from "./sheet-sources";
 import { GoogleAds } from "./google-ads";
-import { Members, type Member } from "./members";
+import { Members, TeamAccess, type Member } from "./members";
 import type { GoogleAdsSettings } from "@/lib/google-ads";
 import type { PrivacySettings as PrivacyData } from "@/lib/privacy";
 
@@ -101,9 +101,11 @@ function Tile({ status, title, summary, href }: { status: Status; title: string;
 export default async function ClientPage({ params, searchParams }: PageProps<"/admin/clientes/[id]">) {
   const { id } = await params;
   const requested = (await searchParams).aba;
-  const tab: Tab = TABS.some((t) => t.key === requested) ? (requested as Tab) : "visao";
-  const { token, role } = await requireAdmin();
+  const { token, role, team } = await requireAdmin();
   const manages = role !== "conta";
+  // The client's team (from the sheet) sees no access settings.
+  const tabs = team ? TABS.filter((t) => t.key !== "acessos") : TABS;
+  const tab: Tab = tabs.some((t) => t.key === requested) ? (requested as Tab) : "visao";
 
   // Everything at once: each call is a round trip to the database.
   const args = { p_token: token, p_workspace_id: id };
@@ -113,7 +115,7 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
       if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) return null;
       throw error;
     });
-  const [client, eventList, meta, pixelList, privacy, leadForms, sourceList, googleAds, admins, memberList, origin] = await Promise.all([
+  const [client, eventList, meta, pixelList, privacy, leadForms, sourceList, googleAds, admins, memberList, teamAccess, origin] = await Promise.all([
     found(call<ClientSummary>("lh_admin_workspace", args)),
     found(call<LeadEvent[]>("lh_admin_list_events", { ...args, p_limit: 50 })),
     found(call<MetaSettingsData>("lh_admin_get_meta", args)),
@@ -124,6 +126,7 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
     found(call<GoogleAdsSettings | null>("lh_admin_get_google_ads", args)),
     role === "master" ? call<AdminUser[]>("lh_admin_list_admins", { p_token: token }) : Promise.resolve([] as AdminUser[]),
     manages ? found(call<Member[]>("lh_admin_list_members", args)) : Promise.resolve([] as Member[]),
+    manages ? found(call<boolean>("lh_admin_get_team_access", args)) : Promise.resolve(false),
     appOrigin(),
   ]);
   if (!client || !meta || !privacy || !leadForms) notFound();
@@ -170,13 +173,15 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
             {client.last_lead_at && ` · último lead ${timeSince(client.last_lead_at, now)}`}
           </p>
         </div>
-        <form action={openClientSheet.bind(null, client.id)}>
-          <Button>Abrir planilha do cliente</Button>
-        </form>
+        {!team && (
+          <form action={openClientSheet.bind(null, client.id)}>
+            <Button>Abrir planilha do cliente</Button>
+          </form>
+        )}
       </div>
 
       <nav className="-mx-4 flex gap-1 overflow-x-auto border-b border-zinc-200 px-4 [scrollbar-width:none] md:mx-0 md:px-0" aria-label="Seções do cliente">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <Link
             key={t.key}
             href={t.key === "visao" ? base : `${base}?aba=${t.key}`}
@@ -196,7 +201,7 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
             <ul className="-m-4 divide-y divide-zinc-100">
               <StepRow
                 status={lpStatus}
-                title="1. Landing Pages recebendo visitas"
+                title="Landing Pages recebendo visitas"
                 detail={
                   client.pages.length === 0
                     ? "Nenhuma Landing Page cadastrada."
@@ -209,32 +214,34 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
               />
               <StepRow
                 status={metaStatus}
-                title="2. Retorno para a Meta (API de Conversões)"
+                title="Retorno para a Meta (API de Conversões)"
                 detail={metaDetail}
                 href={`${base}?aba=conversoes#meta`}
                 action="Configurar Meta"
               />
-              <StepRow
-                status="ok"
-                title="3. Acesso do atendente"
-                detail={
-                  <>
-                    Planilha em <code className="font-mono text-xs">{`${origin}/w/${client.slug}`}</code>
-                  </>
-                }
-                href={`${base}?aba=acessos`}
-                action="Ver acessos"
-              />
+              {!team && (
+                <StepRow
+                  status="ok"
+                  title="Acesso do atendente"
+                  detail={
+                    <>
+                      Planilha em <code className="font-mono text-xs">{`${origin}/w/${client.slug}`}</code>
+                    </>
+                  }
+                  href={`${base}?aba=acessos`}
+                  action="Ver acessos"
+                />
+              )}
               <StepRow
                 status={privacyStatus}
-                title="4. Privacidade (LGPD)"
+                title="Privacidade (LGPD)"
                 detail={privacy.controller ? `Responsável pelos dados: ${privacy.controller}` : "Falta o responsável pelos dados e o e-mail de contato da política."}
                 href={`${base}?aba=privacidade`}
                 action="Revisar"
               />
               <StepRow
                 status={googleStatus}
-                title="5. Google Ads (opcional)"
+                title="Google Ads (opcional)"
                 detail={googleAds ? `Feed de conversões ${googleAds.enabled ? "ligado" : "desligado"}${googleAds.last_fetch_at ? ` · última busca ${timeSince(googleAds.last_fetch_at, now)}` : ""}` : "Só para quem anuncia no Google."}
                 href={`${base}?aba=conversoes#google`}
                 action="Configurar Google"
@@ -367,7 +374,7 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
         </>
       )}
 
-      {tab === "acessos" && (
+      {tab === "acessos" && !team && (
         <>
           <Card title="Atendentes (planilha do cliente)">
             <div className="flex flex-col gap-3 text-sm">
@@ -381,6 +388,11 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
               <ResetPassword origin={origin} id={client.id} name={client.name} slug={client.slug} />
             </div>
           </Card>
+          {manages && (
+            <Card title="Integrações pelos atendentes">
+              <TeamAccess workspaceId={client.id} enabled={teamAccess === true} />
+            </Card>
+          )}
           {manages && (
             <Card title="Pessoas com acesso à configuração deste cliente">
               <Members workspaceId={client.id} client={client.name} origin={origin} members={members} />

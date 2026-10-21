@@ -6,8 +6,29 @@ import { AdminPush } from "./admin-push";
 import { NavTabs } from "./nav-tabs";
 
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const { login, role } = await requireAdmin();
+  const { login, role, team } = await requireAdmin();
   const initial = login.trim().charAt(0).toUpperCase() || "?";
+  // The client's team (attendant password + "Integrações"): only this client's settings and the way back.
+  if (team) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-900/95 text-white backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+            <span className="flex min-w-0 items-center gap-2 font-semibold">
+              <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-emerald-500 text-sm text-zinc-900">C</span>
+              <span className="truncate">
+                {team.name} <span className="font-normal text-zinc-400">· Integrações</span>
+              </span>
+            </span>
+            <Link href={`/w/${team.slug}`} className="shrink-0 rounded-full bg-white px-3 py-1.5 text-sm font-medium text-zinc-900">
+              ← Voltar à planilha
+            </Link>
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-6xl flex-1 p-4">{children}</main>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-900/95 text-white backdrop-blur">
