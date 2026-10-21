@@ -102,7 +102,7 @@ export default async function ClientPage({ params }: PageProps<"/admin/clientes/
 
       <div className="mt-2">
         <h2 className="text-base font-semibold">Fontes de leads</h2>
-        <p className="text-sm text-zinc-600">De onde os leads deste cliente chegam. Todos caem na mesma planilha e na fila Atender, com a fonte marcada.</p>
+        <p className="text-sm text-zinc-600">De onde os leads deste cliente chegam. Todos caem na mesma planilha, com a fonte marcada.</p>
       </div>
 
       <Card title="Google Sheets (formulários da Meta e outras planilhas)">

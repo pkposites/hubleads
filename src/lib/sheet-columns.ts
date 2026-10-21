@@ -33,7 +33,7 @@ export const FIXED_COLUMNS = {
   page: "Página",
   device: "Dispositivo",
   clicks: "Cliques",
-  notes: "Observações",
+  meta_ids: "Identificação Meta",
 } as const;
 
 export type FixedColumn = keyof typeof FIXED_COLUMNS;

@@ -37,7 +37,7 @@ export async function login(_prev: FormState, formData: FormData): Promise<FormS
     path: "/",
     maxAge: 60 * 60 * 24 * 30,
   });
-  redirect(`/w/${result.slug}/atender`);
+  redirect(`/w/${result.slug}`);
 }
 
 export async function logout(slug: string) {

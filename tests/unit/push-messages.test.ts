@@ -7,7 +7,7 @@ describe("new-lead notices", () => {
   it("the admin notice names the client and opens it; the team's opens the queue", () => {
     const m = newLeadMessages({ ...base, lead: { code: "AB12", name: "Carla", channel: "meta_ads", source: "meta_form", ad: "Vídeo", campaign: null } });
     expect(m.admin).toEqual({ title: "Novo lead · Ludmilla", body: "Carla — Formulário Meta · Vídeo", url: "/admin/clientes/ws-1", tag: "lead-AB12" });
-    expect(m.client).toMatchObject({ title: "Novo lead · AB12", url: "/w/ludleads/atender", body: "Carla — Formulário Meta · Vídeo" });
+    expect(m.client).toMatchObject({ title: "Novo lead · AB12", url: "/w/ludleads", body: "Carla — Formulário Meta · Vídeo" });
   });
 
   it("landing page leads show the channel; no name is written as such", () => {

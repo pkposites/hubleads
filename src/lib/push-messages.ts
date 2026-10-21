@@ -15,7 +15,7 @@ export function newLeadMessages(push: NewLeadInfo) {
     .join(" · ");
   const body = `${push.lead.name ?? "Sem nome"}${origin ? ` — ${origin}` : ""}`;
   return {
-    client: { title: `Novo lead · ${push.lead.code}`, body, url: `/w/${push.slug}/atender`, tag: `lead-${push.lead.code}` },
+    client: { title: `Novo lead · ${push.lead.code}`, body, url: `/w/${push.slug}`, tag: `lead-${push.lead.code}` },
     admin: { title: `Novo lead · ${push.company}`, body, url: `/admin/clientes/${push.workspace_id}`, tag: `lead-${push.lead.code}` },
   };
 }

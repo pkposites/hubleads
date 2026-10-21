@@ -27,7 +27,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
     <PanelProvider value={{ slug, company: workspace.name, templates, isAdmin: asAdmin, columns, answers: sheet.answers, stages: sheet.stages ?? [], meta: sheet.meta ?? { schedule: false, purchase: false } }}>
       <div className="flex flex-1 flex-col">
         <AutoRefresh />
-        <NewLeadAlert latest={counts.latest} waiting={counts.waiting} />
+        <NewLeadAlert latest={counts.latest} />
         {asAdmin && (
           <div className="flex items-center justify-between gap-3 bg-zinc-900 px-4 py-1.5 text-xs text-zinc-200">
             <span>Você está vendo a planilha como administrador.</span>
@@ -51,7 +51,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
               </form>
             </div>
             <div className="-mx-3 w-[calc(100%+1.5rem)] overflow-x-auto px-3 sm:mx-0 sm:w-auto sm:px-0">
-              <PanelNav slug={slug} queue={counts.waiting + counts.due} />
+              <PanelNav slug={slug} queue={counts.due} />
             </div>
           </div>
         </header>

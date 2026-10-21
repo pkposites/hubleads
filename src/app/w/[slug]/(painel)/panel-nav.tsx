@@ -10,8 +10,8 @@ export function PanelNav({ slug, queue }: { slug: string; queue: number }) {
   const [tapped, setTapped] = useState<{ href: string; from: string } | null>(null);
   const current = tapped && tapped.from === pathname ? tapped.href : pathname;
   const tabs = [
-    { href: `/w/${slug}/atender`, label: "Atender", badge: queue },
     { href: `/w/${slug}`, label: "Planilha" },
+    { href: `/w/${slug}/atender`, label: "Retornos", badge: queue },
     { href: `/w/${slug}/metricas`, label: "Métricas" },
     { href: `/w/${slug}/mensagens`, label: "Mensagens" },
   ];
@@ -31,7 +31,7 @@ export function PanelNav({ slug, queue }: { slug: string; queue: number }) {
             {t.badge ? (
               <span
                 className={`min-w-5 rounded-full px-1.5 text-center text-xs font-semibold tabular-nums ${active ? "bg-white text-zinc-900" : "bg-red-600 text-white"}`}
-                aria-label={`${t.badge} aguardando`}
+                aria-label={`${t.badge} retornos para hoje`}
               >
                 {t.badge}
               </span>

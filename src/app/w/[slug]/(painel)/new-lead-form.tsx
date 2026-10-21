@@ -20,7 +20,6 @@ export function NewLeadForm({ slug }: { slug: string }) {
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input name="name" placeholder="Nome" className={`${controlClass} w-40`} />
       <input name="phone" placeholder="Telefone" className={`${controlClass} w-40`} />
-      <input name="notes" placeholder="Observação" className={`${controlClass} w-48`} />
       <Button type="submit" disabled={pending}>
         Salvar
       </Button>

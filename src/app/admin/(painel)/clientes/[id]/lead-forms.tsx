@@ -63,7 +63,7 @@ export function LeadForms({ workspaceId, data, serverReady }: { workspaceId: str
   return (
     <div className="flex flex-col gap-4 text-sm">
       <p className="text-zinc-600">
-        Os leads dos formulários nativos (Facebook e Instagram) caem direto na planilha e na fila Atender, em até 1 minuto, com
+        Os leads dos formulários nativos (Facebook e Instagram) caem direto na planilha, em até 1 minuto, com
         campanha, conjunto, anúncio e as respostas. Quando o atendente marca <strong>Agendado</strong> ou <strong>Venda</strong>, o
         Cadê o Lead avisa a Meta como evento de CRM (com o ID do lead), usando o conjunto de dados do cartão abaixo.
       </p>

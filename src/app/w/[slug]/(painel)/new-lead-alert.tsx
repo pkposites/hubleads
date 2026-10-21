@@ -21,15 +21,15 @@ function chime() {
     });
     window.setTimeout(() => ctx.close(), 1000);
   } catch {
-    // Audio blocked until the page gets a tap; the title still changes.
+    // Audio blocked until the page gets a tap.
   }
 }
 
 /**
- * While the panel is open: plays a sound and shows the count in the tab
- * title when a new lead arrives (the page refreshes every few seconds).
+ * While the panel is open: plays a sound when a new lead arrives (the page
+ * refreshes every few seconds).
  */
-export function NewLeadAlert({ latest, waiting }: { latest: string | null; waiting: number }) {
+export function NewLeadAlert({ latest }: { latest: string | null }) {
   const seen = useRef(latest);
   useEffect(() => {
     if (latest && seen.current && latest > seen.current) {
@@ -38,10 +38,5 @@ export function NewLeadAlert({ latest, waiting }: { latest: string | null; waiti
     }
     seen.current = latest;
   }, [latest]);
-
-  useEffect(() => {
-    const base = document.title.replace(/^\(\d+\) /, "");
-    document.title = waiting > 0 ? `(${waiting}) ${base}` : base;
-  }, [waiting]);
   return null;
 }

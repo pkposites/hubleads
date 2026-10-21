@@ -197,7 +197,7 @@ export async function openClientSheet(workspaceId: string) {
     p_workspace_id: workspaceId,
   });
   (await cookies()).set(SESSION_COOKIE, session.token, cookieOptions(60 * 60 * 12));
-  redirect(`/w/${session.slug}/atender`);
+  redirect(`/w/${session.slug}`);
 }
 
 export async function updatePageSettings(

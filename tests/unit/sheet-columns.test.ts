@@ -27,7 +27,7 @@ describe("sheet columns", () => {
       ["ad", "Anúncio"],
       ["device", "Dispositivo"],
       ["clicks", "Cliques"],
-      ["notes", "Observações"],
+      ["meta_ids", "Identificação Meta"],
     ]);
     expect(dataColumns(columns).map((c) => c.key)).toEqual(["Bairro", "Renda", "qual_o_prazo"]);
     expect(showsFixed(columns, "page")).toBe(false);

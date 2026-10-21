@@ -75,7 +75,7 @@ const NOT_YET = [
 
 export default async function Home() {
   const session = await currentSession();
-  if (session) redirect(`/w/${session.workspace.slug}/atender`);
+  if (session) redirect(`/w/${session.workspace.slug}`);
   // The app on the home screen opens here; an admin goes to the painel mãe.
   if (await currentAdmin()) redirect("/admin");
 

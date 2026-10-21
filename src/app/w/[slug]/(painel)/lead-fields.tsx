@@ -69,7 +69,7 @@ export function TextCell({
   className = "w-40",
 }: {
   lead: Lead;
-  field: "name" | "phone" | "notes" | "sale_value";
+  field: "name" | "phone" | "sale_value";
   placeholder: string;
   display?: (value: unknown) => string;
   className?: string;
@@ -236,8 +236,8 @@ export function StatusCell({ lead }: { lead: Lead }) {
         onChange={(e) => {
           const next = e.target.value as Status;
           if (next === "perdido") setAsking(true);
-          // Statuses that go to Meta are confirmed first (they cannot be taken back there).
-          else if ((next === "agendado" && meta.schedule) || (next === "venda" && meta.purchase)) setConfirming(next);
+          // Schedule and sale are always confirmed first: when they go to Meta they cannot be taken back there.
+          else if (next === "agendado" || next === "venda") setConfirming(next);
           else apply(next);
         }}
         className={`rounded px-2 py-1.5 text-base font-medium md:py-1 md:text-sm ${STATUS_STYLE[status]} ${pending ? "opacity-70" : ""}`}
@@ -265,6 +265,7 @@ export function StatusCell({ lead }: { lead: Lead }) {
         <MetaStatusDialog
           lead={lead}
           status={confirming}
+          sends={confirming === "venda" ? meta.purchase : meta.schedule}
           pending={pending}
           error={error}
           onCancel={() => {
@@ -278,10 +279,11 @@ export function StatusCell({ lead }: { lead: Lead }) {
   );
 }
 
-/** Asks before a status that is sent to Meta; a sale also takes its value. */
+/** Asks before a schedule or sale, saying what goes to Meta; a sale also takes its value. */
 function MetaStatusDialog({
   lead,
   status,
+  sends,
   pending,
   error,
   onCancel,
@@ -289,6 +291,8 @@ function MetaStatusDialog({
 }: {
   lead: Lead;
   status: "agendado" | "venda";
+  /** Whether this client sends this status to Meta. */
+  sends: boolean;
   pending: boolean;
   error: string | null;
   onCancel: () => void;
@@ -300,13 +304,24 @@ function MetaStatusDialog({
   return (
     <BottomSheet title={sale ? "Confirmar venda?" : "Confirmar agendamento?"} onClose={onCancel}>
       <div className="flex flex-col gap-3 text-sm">
-        <p>
-          <strong>{lead.name ?? lead.code}</strong> vai para <strong>{STATUSES[status]}</strong> e isso é enviado à Meta como{" "}
-          <strong>{sale ? "Compra (Purchase)" : "Agendamento (Schedule)"}</strong>.
-        </p>
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">
-          Confira antes: depois de enviado, o evento não pode ser desfeito na Meta, mesmo que o status mude aqui.
-        </p>
+        {sends ? (
+          <>
+            <p>
+              <strong>{lead.name ?? lead.code}</strong> vai para <strong>{STATUSES[status]}</strong> e isso é enviado à Meta (conta de
+              anúncios) como <strong>{sale ? "Compra (Purchase), com o valor da venda" : "Agendamento (Schedule)"}</strong>, junto com os
+              dados que identificam a pessoa para a Meta (telefone, nome e clique do anúncio, criptografados).
+            </p>
+            <p className="rounded-md bg-amber-50 px-3 py-2 font-medium text-amber-900">
+              Não tem volta: depois de enviado, o evento não pode ser desfeito na Meta, mesmo que o status ou o valor mudem aqui.
+              Confira o lead e o valor antes de confirmar.
+            </p>
+          </>
+        ) : (
+          <p>
+            <strong>{lead.name ?? lead.code}</strong> vai para <strong>{STATUSES[status]}</strong>. Este cliente não envia{" "}
+            {sale ? "vendas" : "agendamentos"} à Meta: fica registrado só na planilha.
+          </p>
+        )}
         {sale && (
           <label className="flex flex-col gap-1">
             <span className="font-medium">Valor da venda (R$)</span>
@@ -323,7 +338,9 @@ function MetaStatusDialog({
                 ? "Valor inválido."
                 : money
                   ? `Vai como ${moneyDisplay(money)}.`
-                  : "Sem valor, a venda fica registrada aqui mas não é enviada à Meta."}
+                  : sends
+                    ? "Sem valor, a venda fica registrada aqui mas não é enviada à Meta."
+                    : "Sem valor, a venda fica registrada sem valor."}
             </span>
           </label>
         )}
@@ -697,24 +714,5 @@ export function HistoryButton({ lead, className = "" }: { lead: Lead; className?
         </BottomSheet>
       )}
     </>
-  );
-}
-
-/** "esperando há 12 min", colored by how long the lead has waited. */
-export function WaitTimer({ since }: { since: string }) {
-  const [now, setNow] = useState<number | null>(null);
-  useEffect(() => {
-    const tick = () => setNow(Date.now());
-    tick();
-    const id = window.setInterval(tick, 20_000);
-    return () => window.clearInterval(id);
-  }, []);
-  if (now === null) return null;
-  const minutes = Math.max(0, (now - new Date(since).getTime()) / 60_000);
-  const tone = minutes < 5 ? "bg-emerald-100 text-emerald-800" : minutes < 30 ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800";
-  return (
-    <span className={`rounded px-1.5 py-0.5 text-xs font-medium tabular-nums ${tone}`}>
-      esperando há {formatMinutes(Math.floor(minutes))}
-    </span>
   );
 }

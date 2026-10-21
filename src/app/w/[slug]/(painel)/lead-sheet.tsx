@@ -8,7 +8,7 @@ import { formatDateTime, timeSince } from "@/lib/format";
 import { adNames, COLORS, type Lead } from "@/lib/leads";
 import { answerValue, dataColumns, showsFixed, type SheetColumn } from "@/lib/sheet-columns";
 import { deleteLeads } from "../actions";
-import { ColorCell, EventChips, FieldCell, HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StageCell, StatusCell, TextCell, WaitTimer, WhatsAppButton } from "./lead-fields";
+import { ColorCell, EventChips, FieldCell, HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StageCell, StatusCell, TextCell, WhatsAppButton } from "./lead-fields";
 import { usePanel } from "./panel-context";
 
 const path = (url: string | null) => {
@@ -32,6 +32,29 @@ function AdCell({ name, id }: { name: string | null; id: string | null }) {
   );
 }
 
+/** Which ad identifiers arrived with the lead (Meta matches the sale with them). */
+const metaIds = (lead: Lead) =>
+  [lead.fbc && "fbc", lead.fbp && "fbp", lead.gclid && "gclid"].filter((v): v is string => Boolean(v));
+
+function MetaIdsCell({ lead }: { lead: Lead }) {
+  const ids = metaIds(lead);
+  return (
+    <td className="whitespace-nowrap px-2 py-1.5 text-xs" title={lead.fbc ?? undefined}>
+      {ids.length ? (
+        <span className="flex gap-1">
+          {ids.map((id) => (
+            <span key={id} className="rounded bg-emerald-50 px-1.5 py-0.5 font-mono text-emerald-800">
+              {id} ✓
+            </span>
+          ))}
+        </span>
+      ) : (
+        <span className="text-zinc-400">sem clique do anúncio</span>
+      )}
+    </td>
+  );
+}
+
 /** One answer (read as sent) or added column (filled in by the attendant). */
 function DataCell({ lead, column }: { lead: Lead; column: SheetColumn }) {
   if (column.kind === "custom") {
@@ -45,21 +68,18 @@ function DataCell({ lead, column }: { lead: Lead; column: SheetColumn }) {
   return <td className="min-w-32 max-w-60 break-words px-2 py-1.5 text-xs">{muted(value)}</td>;
 }
 
-/** One card per lead: the phone layout of the sheet, and the queue on every screen. */
+/** One card per lead: the phone layout of the sheet, and the follow-ups page. */
 export function LeadCard({
   lead,
   selectable = false,
   selected = false,
   onToggle,
-  waiting = false,
   lpEvents,
 }: {
   lead: Lead;
   selectable?: boolean;
   selected?: boolean;
   onToggle?: () => void;
-  /** Queue: shows how long the lead has been waiting for a first contact. */
-  waiting?: boolean;
   /** Commercial events fired on the landing page. */
   lpEvents?: string[];
 }) {
@@ -80,22 +100,15 @@ export function LeadCard({
             <input type="checkbox" className="size-5" aria-label={`Selecionar ${lead.code}`} checked={selected} onChange={onToggle} />
           )}
           <span className="rounded bg-zinc-900 px-1.5 py-0.5 font-mono text-xs text-white">{lead.code}</span>
-          {waiting && lead.status === "novo" ? (
-            <WaitTimer since={lead.created_at} />
-          ) : (
-            <span className="text-xs text-zinc-500">
-              {formatDateTime(lead.created_at)} · {timeSince(lead.created_at)}
-            </span>
-          )}
+          <span className="text-xs text-zinc-500">
+            {formatDateTime(lead.created_at)} · {timeSince(lead.created_at)}
+          </span>
         </div>
         <span className="shrink-0 text-right text-xs text-zinc-600">
           {channelLabel(lead.channel)}
           <span className="block text-zinc-500">{sourceLabel(lead.source)}</span>
         </span>
       </div>
-      {waiting && (names.ad || names.campaign) && (
-        <p className="mt-1 truncate text-xs text-zinc-500">Anúncio: {names.ad ?? names.campaign}</p>
-      )}
       {lpEvents && lpEvents.length > 0 && (
         <div className="mt-1.5">
           <EventChips events={lpEvents} />
@@ -113,12 +126,11 @@ export function LeadCard({
           <StageCell lead={lead} className="w-full" />
           <ColorCell lead={lead} />
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <StatusCell lead={lead} />
-          <TextCell lead={lead} field="sale_value" placeholder="Valor R$" display={moneyDisplay} className="w-full" />
-        </div>
         <NextContactCell lead={lead} />
-        <TextCell lead={lead} field="notes" placeholder="Anotar observação" className="w-full" />
+        <div className="grid grid-cols-2 gap-2">
+          <TextCell lead={lead} field="sale_value" placeholder="Valor R$" display={moneyDisplay} className="w-full" />
+          <StatusCell lead={lead} />
+        </div>
         {custom.map((c) => (
           <label key={c.key} className="flex items-center gap-2 text-xs text-zinc-500">
             <span className="w-28 shrink-0 truncate">{c.label}</span>
@@ -140,6 +152,7 @@ export function LeadCard({
               ["Página", lead.landing_url],
               ["Dispositivo", lead.device],
               ["Cliques", String(lead.clicks)],
+              ["Meta", metaIds(lead).join(" · ")],
               ...answers,
             ]
               .filter(([, v]) => v)
@@ -292,14 +305,14 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
               ["cod", "Cód."],
               ["nome", "Nome"],
               ["telefone", "Telefone"],
-              ["status", "Status"],
               ["cor", "Qualidade"],
               ["etapa", "Etapa"],
               ["retorno", "Retorno"],
               ["valor", "Valor"],
+              ["status", "Status"],
               ...(show("lp_events") ? [["lp_events", label("lp_events")]] : []),
               ...fields.map((c) => [`f:${c.key}`, c.label]),
-              ...(["origin", "campaign", "adset", "ad", "page", "device", "clicks", "notes"] as const)
+              ...(["origin", "campaign", "adset", "ad", "page", "device", "clicks", "meta_ids"] as const)
                 .filter((k) => show(k))
                 .map((k) => [k, label(k)]),
               ["historico", ""],
@@ -344,9 +357,6 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
                   </div>
                 </div>
               </td>
-              <td className="px-2 py-1">
-                <StatusCell lead={lead} />
-              </td>
               <td className="px-2 py-1.5">
                 <ColorCell lead={lead} />
               </td>
@@ -358,6 +368,9 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
               </td>
               <td className="px-1 py-0.5">
                 <TextCell lead={lead} field="sale_value" placeholder="R$" display={moneyDisplay} className="w-28" />
+              </td>
+              <td className="px-2 py-1">
+                <StatusCell lead={lead} />
               </td>
               {show("lp_events") && (
                 <td className="min-w-40 max-w-56 px-2 py-1.5">
@@ -392,11 +405,7 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
               )}
               {show("device") && <td className="px-2 py-1.5 text-xs">{muted(lead.device)}</td>}
               {show("clicks") && <td className="px-2 py-1.5 text-center">{lead.clicks}</td>}
-              {show("notes") && (
-                <td className="px-1 py-0.5">
-                  <TextCell lead={lead} field="notes" placeholder="Anotar" className="w-56" />
-                </td>
-              )}
+              {show("meta_ids") && <MetaIdsCell lead={lead} />}
               <td className="px-2 py-1.5">
                 <HistoryButton lead={lead} />
               </td>
