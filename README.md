@@ -42,7 +42,7 @@ fontes)** mostra a divisão e as Métricas têm **Leads por fonte**.
 
 1. A LP recebe uma linha de código (em **Instalação na LP** no painel):
    ```html
-   <script src="https://leadinghub.netlify.app/tracker.js" data-key="pk_..." async></script>
+   <script src="https://cadeolead.com.br/tracker.js" data-key="pk_..." async></script>
    ```
 2. O script guarda as UTMs, os identificadores de clique e os cookies `_fbp` e
    `_fbc` do pixel da Meta, e envia uma visita ao abrir a página.
@@ -291,8 +291,11 @@ select lh_private.set_server_secret('<mesmo valor de LH_SERVER_SECRET>');
 
 ## Ambiente de teste
 
-- App: https://leadinghub.netlify.app (Netlify, projeto `leadinghub`, branch
-  `claude/new-session-hmpokh`).
+- App: https://cadeolead.com.br (Netlify, projeto `leadinghub`, branch
+  `claude/new-session-hmpokh`). O endereço antigo, https://leadinghub.netlify.app,
+  continua respondendo: as LPs, planilhas e feeds do Google Ads já instalados
+  com ele seguem funcionando. Links novos (atendente, script da LP, planilha,
+  Google Ads, e-mail) usam `NEXT_PUBLIC_APP_URL=https://cadeolead.com.br`.
 - Banco: projeto Supabase `rda-report-panel`, tabelas `lh_*`.
 - Variáveis no Netlify: `NEXT_PUBLIC_SUPABASE_URL`,
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_APP_URL`,

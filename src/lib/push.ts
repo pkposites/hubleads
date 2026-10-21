@@ -13,7 +13,7 @@ function configured() {
   const publicKey = vapidPublicKey();
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!secret || !publicKey || !privateKey) return null;
-  const subject = process.env.VAPID_SUBJECT || process.env.NEXT_PUBLIC_APP_URL || "https://leadinghub.netlify.app";
+  const subject = process.env.VAPID_SUBJECT || process.env.NEXT_PUBLIC_APP_URL || "https://cadeolead.com.br";
   return { secret, vapid: { subject, publicKey, privateKey } };
 }
 
