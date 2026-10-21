@@ -22,7 +22,10 @@ export interface ClientSummary {
   pages: Page[];
 }
 
-export type AdminRole = "master" | "gestor";
+/** master: everything; gestor: the clients they own; conta: a person of the client, only the clients they were given. */
+export type AdminRole = "master" | "gestor" | "conta";
+
+export const ROLE_LABEL: Record<AdminRole, string> = { master: "master", gestor: "gestor", conta: "conta" };
 
 export interface AdminUser {
   id: string;

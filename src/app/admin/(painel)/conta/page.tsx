@@ -13,7 +13,11 @@ export default async function AccountPage() {
           <dt className="text-zinc-500">E-mail</dt>
           <dd>{login}</dd>
           <dt className="text-zinc-500">Perfil</dt>
-          <dd>{role === "master" ? "Master (vê todos os clientes e os gestores)" : "Gestor (vê os clientes dele)"}</dd>
+          <dd>{role === "master"
+              ? "Master (vê todos os clientes e os gestores)"
+              : role === "gestor"
+                ? "Gestor (vê os clientes dele)"
+                : "Pessoa da conta (vê só os clientes liberados para você)"}</dd>
         </dl>
       </Card>
       <Card title="Trocar senha">

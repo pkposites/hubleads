@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdmin, ROLE_LABEL } from "@/lib/admin";
 import { vapidPublicKey } from "@/lib/push";
 import { adminLogout } from "../actions";
 import { AdminPush } from "./admin-push";
@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
               </span>
             </Link>
             <div className="flex items-center gap-2 md:hidden">
-              <AdminPush vapidKey={vapidPublicKey()} master={role === "master"} />
+              {role !== "conta" && <AdminPush vapidKey={vapidPublicKey()} master={role === "master"} />}
               <Link
                 href="/admin/conta"
                 title={`${login} (${role})`}
@@ -30,13 +30,13 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
               </Link>
             </div>
           </div>
-          <NavTabs master={role === "master"} />
+          <NavTabs role={role} />
           <div className="ml-auto hidden items-center gap-3 text-sm text-zinc-300 md:flex">
-            <AdminPush vapidKey={vapidPublicKey()} master={role === "master"} />
+            {role !== "conta" && <AdminPush vapidKey={vapidPublicKey()} master={role === "master"} />}
             <Link href="/admin/conta" className="flex items-center gap-2 hover:text-white" title="Minha conta">
               <span className="grid size-7 place-items-center rounded-full bg-zinc-700 text-xs font-medium text-white">{initial}</span>
               <span className="max-w-48 truncate">{login}</span>
-              <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-xs">{role === "master" ? "master" : "gestor"}</span>
+              <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-xs">{ROLE_LABEL[role]}</span>
             </Link>
             <form action={adminLogout}>
               <button className="hover:text-white hover:underline">Sair</button>

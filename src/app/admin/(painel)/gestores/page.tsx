@@ -24,7 +24,7 @@ export default async function GestoresPage() {
 
       <Card title="Acessos">
         <ul className="divide-y divide-zinc-100">
-          {admins.map((a) => (
+          {admins.filter((a) => a.role !== "conta").map((a) => (
             <li key={a.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

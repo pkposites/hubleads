@@ -1,8 +1,10 @@
+import { redirect } from "next/navigation";
 import { appOrigin, requireAdmin } from "@/lib/admin";
 import { CreateClientForm } from "./create-client-form";
 
 export default async function NewClientPage() {
-  await requireAdmin();
+  // People of a client manage only the clients they were given.
+  if ((await requireAdmin()).role === "conta") redirect("/admin");
   return (
     <div className="flex flex-col gap-4">
       <div>

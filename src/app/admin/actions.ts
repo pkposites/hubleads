@@ -375,6 +375,52 @@ export async function transferClient(workspaceId: string, _prev: AdminFormState,
   return { ok: "Responsável atualizado." };
 }
 
+// ---------------------------------------------------------------------------
+// People of a client (role "conta"): only the master and the owner manage them
+// ---------------------------------------------------------------------------
+
+export type MemberState = { error?: string; created?: { login: string; password?: string } } | undefined;
+
+export async function addMember(workspaceId: string, _prev: MemberState, formData: FormData): Promise<MemberState> {
+  const { token } = await requireAdmin();
+  const login = String(formData.get("login") ?? "").trim().toLowerCase();
+  if (!EMAIL.test(login)) return { error: "Informe o e-mail da pessoa." };
+  try {
+    const result = await call<{ login: string; password?: string }>("lh_admin_add_member", {
+      p_token: token,
+      p_workspace_id: workspaceId,
+      p_login: login,
+    });
+    revalidatePath(`/admin/clientes/${workspaceId}`);
+    return { created: result };
+  } catch (error) {
+    if (error instanceof DbError && error.code === "LH409") return { error: "Esse e-mail já é de um gestor ou do master. Use outro e-mail." };
+    if (error instanceof DbError && error.code === "LH403") return { error: "Só o master ou o gestor responsável dá acesso." };
+    return { error: "Não foi possível dar o acesso." };
+  }
+}
+
+export async function resetMemberPassword(workspaceId: string, adminId: string): Promise<{ password?: string; error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    const password = await call<string>("lh_admin_reset_member_password", { p_token: token, p_workspace_id: workspaceId, p_admin_id: adminId });
+    return { password };
+  } catch {
+    return { error: "Não foi possível gerar a senha." };
+  }
+}
+
+export async function removeMember(workspaceId: string, adminId: string): Promise<{ error?: string }> {
+  const { token } = await requireAdmin();
+  try {
+    await call("lh_admin_remove_member", { p_token: token, p_workspace_id: workspaceId, p_admin_id: adminId });
+    revalidatePath(`/admin/clientes/${workspaceId}`);
+    return {};
+  } catch {
+    return { error: "Não foi possível tirar o acesso." };
+  }
+}
+
 /** Master only: deletes the client and everything of it, after typing its name. */
 export async function deleteClient(workspaceId: string, _prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
   const { token } = await requireAdmin();

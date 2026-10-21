@@ -45,8 +45,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Secrets saved in the database (the Meta token) are encrypted by the app with
   `encryptSecret` (`src/lib/crypto.ts`, key `LH_ENCRYPTION_KEY`); the database
   rejects plain values. Security/LGPD status and plan: `docs/SEGURANCA-LGPD.md`.
-- Admins are `master` or `gestor`; a gestor only manages clients they own
-  (`lh_workspaces.owner_admin_id`). Every public `lh_admin_*` function that
+- Admins are `master`, `gestor` or `conta`; a gestor only manages clients they own
+  (`lh_workspaces.owner_admin_id`); a `conta` person (someone of the client) only
+  the clients in `lh_workspace_members`, cannot create clients nor give access. Every public `lh_admin_*` function that
   takes a client or page id must call `lh_private.admin_check_workspace` first
   (tests/db/gestores.test.ts enforces it for all of them).
 - UI copy is in Brazilian Portuguese.

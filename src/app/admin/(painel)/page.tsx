@@ -3,6 +3,7 @@ import { buttonClass, EmptyState } from "@/components/ui";
 import { requireAdmin, type ClientSummary } from "@/lib/admin";
 import { call } from "@/lib/db";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { AlertMode } from "@/components/dismissible-alert";
 import { ACTIVITY_LABEL, clientActivity, idleClients } from "@/lib/client-alerts";
 import { formatDateTime, timeSince } from "@/lib/format";
@@ -28,6 +29,8 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
     const [mode, sig] = (store.get(`lh_alert_${id}`)?.value ?? "").split(".");
     return sig === signature && (mode === "min" || mode === "hide") ? mode : "open";
   };
+  // A person of a single client goes straight to it.
+  if (role === "conta" && clients.length === 1) redirect(`/admin/clientes/${clients[0].id}`);
   const now = new Date();
   const idle = idleClients(clients, now);
   // Most recent activity first: the clients that matter today are on top.
@@ -64,12 +67,16 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
       {infra && <InfraAlert status={evaluateInfra(infra, dbLimitMb())} numbers={infra} mode={modeOf("banco")} />}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Clientes</h1>
-        <Link href="/admin/novo" className={`${buttonClass()} hidden md:inline-flex`}>
-          + Novo cliente
-        </Link>
+        {role !== "conta" && (
+          <Link href="/admin/novo" className={`${buttonClass()} hidden md:inline-flex`}>
+            + Novo cliente
+          </Link>
+        )}
       </div>
       {clients.length === 0 ? (
-        <EmptyState title="Nenhum cliente ainda">Crie o primeiro para gerar o código da LP e a senha do atendente.</EmptyState>
+        <EmptyState title="Nenhum cliente ainda">
+          {role === "conta" ? "Nenhum cliente foi liberado para você ainda." : "Crie o primeiro para gerar o código da LP e a senha do atendente."}
+        </EmptyState>
       ) : (
         <>
         <ul className="flex flex-col gap-2 md:hidden">
