@@ -10,6 +10,14 @@ const common = [
 ];
 
 const nextConfig: NextConfig = {
+  // Netlify sometimes forwards a request under the deploy's own address
+  // (x-forwarded-host) while the browser is on cadeolead.com.br; without this,
+  // Next.js refuses the action as cross-site. Only our own addresses.
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["cadeolead.com.br", "www.cadeolead.com.br", "leadinghub.netlify.app"],
+    },
+  },
   async headers() {
     return [
       { source: "/:path*", headers: common },
