@@ -5,10 +5,10 @@ const cx = (...classes: (string | false | null | undefined)[]) => classes.filter
 export const buttonClass = (variant: "primary" | "secondary" | "danger" = "primary") =>
   cx(
     // Taller on phones so every button is an easy tap target.
-    "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition active:scale-[0.97] sm:min-h-0 sm:py-1.5",
+    "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition active:scale-[0.97] sm:min-h-0 sm:py-1.5",
     "disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900",
-    variant === "primary" && "bg-zinc-900 text-white hover:bg-zinc-700",
-    variant === "secondary" && "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50",
+    variant === "primary" && "bg-zinc-900 text-white shadow-sm hover:bg-zinc-800",
+    variant === "secondary" && "border border-zinc-200 bg-white text-zinc-800 shadow-xs hover:border-zinc-300 hover:bg-zinc-50",
     variant === "danger" && "border border-red-200 bg-white text-red-700 hover:bg-red-50",
   );
 
@@ -23,7 +23,7 @@ export function Button({
 /** Input styling without a width, for inline controls such as filters. */
 // 16px text on phones keeps iOS from zooming in when a field gets focus.
 export const controlClass =
-  "rounded-md border border-zinc-300 bg-white px-2.5 py-2 text-base shadow-xs placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none sm:py-1.5 sm:text-sm";
+  "rounded-lg border border-zinc-200 bg-white px-3 py-2 text-base shadow-xs placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-3 focus:ring-zinc-900/5 sm:py-1.5 sm:text-sm";
 
 export const inputClass = `w-full ${controlClass}`;
 
@@ -39,14 +39,14 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
 
 export function Card({ title, actions, children, className }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cx("rounded-xl border border-zinc-200 bg-white", className)}>
+    <section className={cx("rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]", className)}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-3">
+        <header className="flex items-center justify-between gap-2 border-b border-zinc-100 px-5 py-3.5">
           <h2 className="text-sm font-semibold text-zinc-900">{title}</h2>
           {actions}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      <div className="p-5">{children}</div>
     </section>
   );
 }
@@ -55,7 +55,7 @@ export function Badge({ tone = "neutral", children }: { tone?: "neutral" | "warn
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
         tone === "neutral" && "bg-zinc-100 text-zinc-700",
         tone === "warn" && "bg-amber-100 text-amber-800",
         tone === "good" && "bg-emerald-100 text-emerald-800",
@@ -75,7 +75,7 @@ export function FormMessage({ state }: { state: { error?: string; ok?: string } 
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-zinc-300 bg-white px-6 py-10 text-center">
+    <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-12 text-center">
       <p className="font-medium text-zinc-900">{title}</p>
       {children && <div className="mt-2 text-sm text-zinc-600">{children}</div>}
     </div>

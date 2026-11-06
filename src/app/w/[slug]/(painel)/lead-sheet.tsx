@@ -5,10 +5,10 @@ import { Button } from "@/components/ui";
 import { channelLabel } from "@/lib/attribution";
 import { sourceLabel } from "@/lib/source-labels";
 import { formatDateTime, timeSince } from "@/lib/format";
-import { adNames, COLORS, type Lead } from "@/lib/leads";
+import { adNames, COLORS, STATUSES, type Lead } from "@/lib/leads";
 import { answerValue, dataColumns, showsFixed, type SheetColumn } from "@/lib/sheet-columns";
 import { deleteLeads } from "../actions";
-import { ColorCell, EventChips, FieldCell, HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StageCell, StatusCell, TextCell, WhatsAppButton } from "./lead-fields";
+import { ColorCell, EventChips, FieldCell, HistoryButton, moneyDisplay, NextContactCell, phoneDisplay, StageCell, STATUS_STYLE, StatusCell, TextCell, WhatsAppButton } from "./lead-fields";
 import { usePanel } from "./panel-context";
 
 const path = (url: string | null) => {
@@ -68,7 +68,11 @@ function DataCell({ lead, column }: { lead: Lead; column: SheetColumn }) {
   return <td className="min-w-32 max-w-60 break-words px-2 py-1.5 text-xs">{muted(value)}</td>;
 }
 
-/** One card per lead: the phone layout of the sheet, and the follow-ups page. */
+/**
+ * One card per lead: the phone layout of the sheet, and the follow-ups page.
+ * Closed it shows who the lead is (name, phone, status, WhatsApp); a tap opens
+ * everything the attendant fills in.
+ */
 export function LeadCard({
   lead,
   selectable = false,
@@ -83,6 +87,7 @@ export function LeadCard({
   /** Commercial events fired on the landing page. */
   lpEvents?: string[];
 }) {
+  const [open, setOpen] = useState(false);
   const names = adNames(lead);
   const { columns } = usePanel();
   const fields = dataColumns(columns);
@@ -90,82 +95,91 @@ export function LeadCard({
   const answers = fields.filter((c) => c.kind === "answer").map((c) => [c.label, answerValue(lead.extra?.[c.key])]);
   return (
     <li
-      className={`rounded-lg border bg-white p-3 ${selected ? "border-red-300 bg-red-50/50" : "border-zinc-200"} ${
-        lead.color ? `border-l-4 ${COLORS[lead.color].border}` : ""
-      }`}
+      className={`overflow-hidden rounded-2xl border bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] ${
+        selected ? "border-red-300 bg-red-50/50" : "border-zinc-200/80"
+      } ${lead.color ? `border-l-4 ${COLORS[lead.color].border}` : ""}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {selectable && (
-            <input type="checkbox" className="size-5" aria-label={`Selecionar ${lead.code}`} checked={selected} onChange={onToggle} />
-          )}
-          <span className="rounded bg-zinc-900 px-1.5 py-0.5 font-mono text-xs text-white">{lead.code}</span>
-          <span className="text-xs text-zinc-500">
-            {formatDateTime(lead.created_at)} · {timeSince(lead.created_at)}
+      <div className="flex items-center gap-3 px-3.5 py-3">
+        {selectable && (
+          <input type="checkbox" className="size-5 shrink-0" aria-label={`Selecionar ${lead.code}`} checked={selected} onChange={onToggle} />
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left"
+        >
+          <span className="flex w-full items-center gap-2">
+            <span className="truncate text-[15px] font-semibold text-zinc-900">{lead.name || "Sem nome"}</span>
+            <span className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_STYLE[lead.status]}`}>
+              {STATUSES[lead.status]}
+            </span>
           </span>
-        </div>
-        <span className="shrink-0 text-right text-xs text-zinc-600">
-          {channelLabel(lead.channel)}
-          <span className="block text-zinc-500">{sourceLabel(lead.source)}</span>
-        </span>
+          <span className="flex w-full items-center gap-2 text-sm text-zinc-600">
+            <span className="truncate tabular-nums">{lead.phone ? phoneDisplay(lead.phone) : "Sem telefone"}</span>
+            <span className="ml-auto shrink-0 text-xs text-zinc-400">{timeSince(lead.created_at)}</span>
+          </span>
+          <span className="flex w-full items-center gap-1.5 text-xs text-zinc-500">
+            <span className="rounded-md bg-zinc-100 px-1.5 py-px font-mono text-[11px] text-zinc-700">{lead.code}</span>
+            <span className="truncate">{channelLabel(lead.channel)} · {sourceLabel(lead.source)}</span>
+            <svg aria-hidden viewBox="0 0 20 20" className={`ml-auto size-4 shrink-0 text-zinc-400 transition ${open ? "rotate-180" : ""}`}>
+              <path d="M5 8l5 5 5-5" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </button>
+        <WhatsAppButton lead={lead} compact />
       </div>
-      {lpEvents && lpEvents.length > 0 && (
-        <div className="mt-1.5">
-          <EventChips events={lpEvents} />
+      {open && (
+        <div className="flex flex-col gap-2 border-t border-zinc-100 bg-zinc-50/60 px-3.5 pb-3 pt-3">
+          <span className="text-xs text-zinc-500">Entrou em {formatDateTime(lead.created_at)}</span>
+          {lpEvents && lpEvents.length > 0 && <EventChips events={lpEvents} />}
+          <TextCell lead={lead} field="name" placeholder="Nome" className="w-full" />
+          <TextCell lead={lead} field="phone" placeholder="Preencher telefone" display={phoneDisplay} className="w-full" />
+          <div className="flex items-center justify-between gap-2">
+            <StageCell lead={lead} className="w-full" />
+            <ColorCell lead={lead} />
+          </div>
+          <NextContactCell lead={lead} />
+          <div className="grid grid-cols-2 gap-2">
+            <TextCell lead={lead} field="sale_value" placeholder="Valor R$" display={moneyDisplay} className="w-full" />
+            <StatusCell lead={lead} />
+          </div>
+          {custom.map((c) => (
+            <label key={c.key} className="flex items-center gap-2 text-xs text-zinc-500">
+              <span className="w-28 shrink-0 truncate">{c.label}</span>
+              <div className="flex-1">
+                <FieldCell lead={lead} field={c.key} label={c.label} className="w-full" />
+              </div>
+            </label>
+          ))}
+          <div className="flex items-center justify-between gap-2">
+            <details className="min-w-0 flex-1 text-sm">
+              <summary className="cursor-pointer py-1 text-zinc-600">Origem e respostas</summary>
+              <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                {[
+                  ["Campanha", names.campaign],
+                  ["Conjunto", names.adset],
+                  ["Anúncio", names.ad],
+                  ["Fonte", [lead.utm_source, lead.utm_medium].filter(Boolean).join(" / ")],
+                  ["Página", lead.landing_url],
+                  ["Dispositivo", lead.device],
+                  ["Cliques", String(lead.clicks)],
+                  ["Meta", metaIds(lead).join(" · ")],
+                  ...answers,
+                ]
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => (
+                    <div key={k} className="contents">
+                      <dt className="text-zinc-500">{k}</dt>
+                      <dd className="break-all">{v}</dd>
+                    </div>
+                  ))}
+              </dl>
+            </details>
+            <HistoryButton lead={lead} className="self-start py-1" />
+          </div>
         </div>
       )}
-      <div className="mt-2 flex flex-col gap-1">
-        <TextCell lead={lead} field="name" placeholder="Nome" className="w-full" />
-        <div className="flex items-start gap-2">
-          <div className="flex-1">
-            <TextCell lead={lead} field="phone" placeholder="Preencher telefone" display={phoneDisplay} className="w-full" />
-          </div>
-          <WhatsAppButton lead={lead} />
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <StageCell lead={lead} className="w-full" />
-          <ColorCell lead={lead} />
-        </div>
-        <NextContactCell lead={lead} />
-        <div className="grid grid-cols-2 gap-2">
-          <TextCell lead={lead} field="sale_value" placeholder="Valor R$" display={moneyDisplay} className="w-full" />
-          <StatusCell lead={lead} />
-        </div>
-        {custom.map((c) => (
-          <label key={c.key} className="flex items-center gap-2 text-xs text-zinc-500">
-            <span className="w-28 shrink-0 truncate">{c.label}</span>
-            <div className="flex-1">
-              <FieldCell lead={lead} field={c.key} label={c.label} className="w-full" />
-            </div>
-          </label>
-        ))}
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <details className="min-w-0 flex-1 text-sm">
-          <summary className="cursor-pointer py-1 text-zinc-600">Origem e respostas</summary>
-          <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-            {[
-              ["Campanha", names.campaign],
-              ["Conjunto", names.adset],
-              ["Anúncio", names.ad],
-              ["Fonte", [lead.utm_source, lead.utm_medium].filter(Boolean).join(" / ")],
-              ["Página", lead.landing_url],
-              ["Dispositivo", lead.device],
-              ["Cliques", String(lead.clicks)],
-              ["Meta", metaIds(lead).join(" · ")],
-              ...answers,
-            ]
-              .filter(([, v]) => v)
-              .map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="text-zinc-500">{k}</dt>
-                  <dd className="break-all">{v}</dd>
-                </div>
-              ))}
-          </dl>
-        </details>
-        <HistoryButton lead={lead} className="self-start py-1" />
-      </div>
     </li>
   );
 }
@@ -286,9 +300,9 @@ export function LeadSheet({ leads, lpEvents = {} }: { leads: Lead[]; lpEvents?: 
           />
         ))}
       </ul>
-    <div className="hidden overflow-x-auto rounded-lg border border-zinc-200 bg-white md:block">
+    <div className="hidden overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] md:block">
       <table className="w-max min-w-full border-collapse text-left text-sm">
-        <thead className="sticky top-0 bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500">
+        <thead className="sticky top-0 bg-zinc-50/90 text-[11px] uppercase tracking-wider text-zinc-500 backdrop-blur">
           <tr className="border-b border-zinc-200">
             {canDelete && (
               <th className="px-2 py-2">

@@ -10,7 +10,7 @@ import { fromLocalInput } from "@/lib/format";
 import type { LpEvent } from "@/lib/lp-events";
 import { isColor, isStatus, parseMoney, type HistoryEntry, type Lead, type Status, type Template } from "@/lib/leads";
 import { normalizePhone } from "@/lib/normalize";
-import type { SheetColumn } from "@/lib/sheet-columns";
+import { METRICS, type SheetColumn } from "@/lib/sheet-columns";
 import { loginClient, lockedMessage } from "@/lib/server";
 import { requireWorkspace, SESSION_COOKIE } from "@/lib/session";
 import { ADMIN_COOKIE, currentAdmin } from "@/lib/admin";
@@ -170,6 +170,20 @@ export async function saveStages(slug: string, stages: string[]): Promise<{ erro
   } catch (error) {
     if (error instanceof DbError && error.code === "LH403") return { error: "Só o administrador pode mudar as etapas." };
     if (error instanceof DbError && error.code === "22023") return { error: "Confira as etapas: não pode haver duas iguais." };
+    return { error: "Não foi possível salvar." };
+  }
+  revalidatePath(`/w/${slug}`, "layout");
+  return {};
+}
+
+/** Top metrics this client does not use (admin only). */
+export async function saveHiddenMetrics(slug: string, metrics: string[]): Promise<{ error?: string }> {
+  const { token } = await requireWorkspace(slug);
+  const clean = metrics.filter((m) => m in METRICS);
+  try {
+    await call("lh_set_hidden_metrics", { p_token: token, p_metrics: clean });
+  } catch (error) {
+    if (error instanceof DbError && error.code === "LH403") return { error: "Só o administrador pode mudar as métricas." };
     return { error: "Não foi possível salvar." };
   }
   revalidatePath(`/w/${slug}`, "layout");

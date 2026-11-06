@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button, inputClass } from "@/components/ui";
-import { answerLabel, type SheetColumn } from "@/lib/sheet-columns";
-import { saveSheetColumns, saveStages } from "../actions";
+import { answerLabel, METRICS, type SheetColumn } from "@/lib/sheet-columns";
+import { saveHiddenMetrics, saveSheetColumns, saveStages } from "../actions";
 import { BottomSheet } from "./bottom-sheet";
 import { usePanel } from "./panel-context";
 
@@ -16,7 +16,7 @@ export function SheetColumnsButton() {
   return (
     <>
       <Button variant="secondary" onClick={() => setOpen(true)}>
-        Colunas e etapas
+        Personalizar
       </Button>
       {open && <ColumnsDialog onClose={() => setOpen(false)} />}
     </>
@@ -24,7 +24,8 @@ export function SheetColumnsButton() {
 }
 
 function ColumnsDialog({ onClose }: { onClose: () => void }) {
-  const { slug, columns: initial, answers, stages: initialStages } = usePanel();
+  const { slug, columns: initial, answers, stages: initialStages, hiddenMetrics } = usePanel();
+  const [hidden, setHidden] = useState<string[]>(hiddenMetrics);
   const [stages, setStages] = useState<string[]>(initialStages);
   const [newStage, setNewStage] = useState("");
   const router = useRouter();
@@ -85,8 +86,9 @@ function ColumnsDialog({ onClose }: { onClose: () => void }) {
     start(async () => {
       const result = await saveSheetColumns(slug, columns);
       const steps = result.error ? result : await saveStages(slug, stages);
-      if (steps.error) {
-        setError(steps.error);
+      const metrics = steps.error ? steps : await saveHiddenMetrics(slug, hidden);
+      if (metrics.error) {
+        setError(metrics.error);
         return;
       }
       onClose();
@@ -94,8 +96,27 @@ function ColumnsDialog({ onClose }: { onClose: () => void }) {
     });
 
   return (
-    <BottomSheet title="Colunas e etapas" onClose={onClose}>
+    <BottomSheet title="Personalizar a planilha" onClose={onClose}>
       <div className="flex flex-col gap-4 text-sm">
+        <section className="flex flex-col gap-2">
+          <div>
+            <h3 className="font-medium">Métricas do topo</h3>
+            <p className="text-xs text-zinc-500">Oculte as que não fazem sentido para este cliente (ex.: Visitantes na LP para quem só recebe formulários).</p>
+          </div>
+          <div className="grid grid-cols-2 gap-1">
+            {Object.entries(METRICS).map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!hidden.includes(key)}
+                  onChange={(e) => setHidden((all) => (e.target.checked ? all.filter((k) => k !== key) : [...all, key]))}
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </section>
+
         <section className="flex flex-col gap-2">
           <div>
             <h3 className="font-medium">Etapas do atendimento</h3>
@@ -244,7 +265,7 @@ function ColumnsDialog({ onClose }: { onClose: () => void }) {
             Cancelar
           </Button>
           <Button onClick={save} disabled={pending}>
-            {pending ? "Salvando..." : "Salvar colunas"}
+            {pending ? "Salvando..." : "Salvar"}
           </Button>
         </div>
       </div>

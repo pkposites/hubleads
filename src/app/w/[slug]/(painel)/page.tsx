@@ -10,6 +10,7 @@ import { TrendLine } from "@/components/trend";
 import { requireWorkspace } from "@/lib/session";
 import { LeadSheet } from "./lead-sheet";
 import { NewLeadForm } from "./new-lead-form";
+import { FiltersToggle } from "./filters-toggle";
 import { PeriodPicker } from "./period-picker";
 import { SheetColumnsButton } from "./sheet-columns-button";
 
@@ -17,9 +18,9 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 
 function Tile({ label, value, hint, trend }: { label: string; value: string | number; hint?: string; trend?: Trend | null }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2.5 sm:px-4 sm:py-3">
-      <div className="text-xs text-zinc-500">{label}</div>
-      <div className="text-xl font-semibold tabular-nums">{value}</div>
+    <div className="rounded-2xl border border-zinc-200/80 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] sm:px-4">
+      <div className="text-xs font-medium text-zinc-500">{label}</div>
+      <div className="mt-0.5 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl">{value}</div>
       <TrendLine trend={trend ?? null} />
       {hint && <div className="text-xs text-zinc-500">{hint}</div>}
     </div>
@@ -53,7 +54,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
       p_limit: 500,
       p_offset: 0,
     }),
-    call<{ stages: string[] }>("lh_sheet_config", { p_token: token }),
+    call<{ stages: string[]; hidden_metrics?: string[] }>("lh_sheet_config", { p_token: token }),
   ]);
 
   const lpEvents = list.rows.length
@@ -72,6 +73,10 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
   const bySource = (stats.by_source ?? []).filter((s) => s.leads > 0);
   const compareText = period.previous ? formatRange(period.previous) : null;
   const trend = (pick: (s: Stats) => number) => (previous ? countTrend(pick(stats), pick(previous)) : null);
+  // Tiles the client does not use are hidden in "Colunas e etapas".
+  const hidden = new Set(sheet.hidden_metrics ?? []);
+  const shown = 6 - [...hidden].length;
+  const columns = ["", "lg:grid-cols-1", "lg:grid-cols-2", "lg:grid-cols-3", "lg:grid-cols-4", "lg:grid-cols-5", "lg:grid-cols-6"].at(shown) ?? "lg:grid-cols-6";
 
   return (
     <div className="flex flex-col gap-4">
@@ -82,34 +87,35 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
         rangeText={period.key === "tudo" ? "Todo o histórico" : formatRange(period)}
         compareText={compareText}
       />
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <Link
+      {shown > 0 && <div className={`grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 ${columns}`}>
+        {!hidden.has("conversion") && <Link
           href={`/w/${slug}/metricas?${new URLSearchParams(period.query)}`}
-          className="col-span-2 rounded-lg border border-[#2a78d6]/30 bg-[#2a78d6]/5 px-3 py-2.5 hover:bg-[#2a78d6]/10 sm:px-4 sm:py-3 md:col-span-1"
+          className="col-span-2 rounded-2xl border border-[#2a78d6]/25 bg-[#2a78d6]/5 px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] hover:bg-[#2a78d6]/10 sm:px-4 md:col-span-1"
         >
-          <div className="text-xs text-zinc-600">Conversão da LP</div>
-          <div className="text-2xl font-semibold">{formatRate(rate(stats.clicks, stats.visitors))}</div>
+          <div className="text-xs font-medium text-zinc-600">Conversão da LP</div>
+          <div className="mt-0.5 text-xl font-semibold tracking-tight sm:text-2xl">{formatRate(rate(stats.clicks, stats.visitors))}</div>
           <TrendLine trend={previous ? rateTrend(rate(stats.clicks, stats.visitors), rate(previous.clicks, previous.visitors)) : null} />
           <div className="text-xs text-zinc-600">Ver métricas →</div>
-        </Link>
-        <Tile
+        </Link>}
+        {!hidden.has("leads") && <Tile
           label="Leads (todas as fontes)"
           value={stats.leads}
           trend={trend((s) => s.leads)}
           hint={bySource.length > 1 ? bySource.map((s) => `${s.leads} ${sourceLabel(s.source)}`).join(" · ") : bySource[0] && sourceLabel(bySource[0].source)}
-        />
-        <Tile label="Visitantes na LP" value={stats.visitors} trend={trend((s) => s.visitors)} />
-        <Tile label="Clicaram no WhatsApp" value={stats.clicks} trend={trend((s) => s.clicks)} />
-        <Tile
+        />}
+        {!hidden.has("visitors") && <Tile label="Visitantes na LP" value={stats.visitors} trend={trend((s) => s.visitors)} />}
+        {!hidden.has("clicks") && <Tile label="Clicaram no WhatsApp" value={stats.clicks} trend={trend((s) => s.clicks)} />}
+        {!hidden.has("with_phone") && <Tile
           label="Com telefone"
           value={stats.with_phone}
           trend={trend((s) => s.with_phone)}
           hint={stats.leads ? `${stats.leads - stats.with_phone} a preencher` : undefined}
-        />
-        <Tile label="Vendas" value={stats.sales} trend={trend((s) => s.sales)} hint={stats.sales ? formatMoney(stats.revenue) : undefined} />
-      </div>
+        />}
+        {!hidden.has("sales") && <Tile label="Vendas" value={stats.sales} trend={trend((s) => s.sales)} hint={stats.sales ? formatMoney(stats.revenue) : undefined} />}
+      </div>}
 
       <div className="flex flex-wrap items-end justify-between gap-3">
+        <FiltersToggle active={Boolean(q || status || channel || source || stage || color)}>
         <form method="get" className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
           {Object.entries(period.query).map(([k, v]) => (
             <input key={k} type="hidden" name={k} value={v} />
@@ -159,6 +165,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
           <input name="q" defaultValue={q} placeholder="Código, nome, telefone, campanha" className={`${controlClass} col-span-2 sm:w-64`} />
           <button className={`${buttonClass("secondary")} col-span-2 sm:col-span-1`}>Filtrar</button>
         </form>
+        </FiltersToggle>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <NewLeadForm slug={slug} />
           <SheetColumnsButton />

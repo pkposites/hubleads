@@ -14,6 +14,7 @@ interface Panel {
   /** Answers found in recent leads, for the column settings. */
   answers: { key: string; leads: number }[];
   stages: string[];
+  hiddenMetrics: string[];
   meta: { schedule: boolean; purchase: boolean };
 }
 

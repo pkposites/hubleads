@@ -17,6 +17,8 @@ export interface SheetConfig {
   columns: SheetColumn[];
   /** The client's internal steps. */
   stages: string[];
+  /** Top metrics of the sheet this client does not use. */
+  hidden_metrics?: MetricKey[];
   /** Statuses that are sent to Meta (the panel asks before them). */
   meta: { schedule: boolean; purchase: boolean };
   /** Answers found in the client's recent leads, most common first. */
@@ -37,6 +39,18 @@ export const FIXED_COLUMNS = {
 } as const;
 
 export type FixedColumn = keyof typeof FIXED_COLUMNS;
+
+/** The tiles at the top of the sheet, in order; a client can hide the ones it does not use. */
+export const METRICS = {
+  conversion: "Conversão da LP",
+  leads: "Leads (todas as fontes)",
+  visitors: "Visitantes na LP",
+  clicks: "Clicaram no WhatsApp",
+  with_phone: "Com telefone",
+  sales: "Vendas",
+} as const;
+
+export type MetricKey = keyof typeof METRICS;
 
 /** Saved settings + answers found + standard columns, in display order. */
 export function resolveColumns(saved: readonly SheetColumn[] | null | undefined, answers: readonly { key: string }[] = []): SheetColumn[] {

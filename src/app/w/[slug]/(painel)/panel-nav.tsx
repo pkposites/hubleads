@@ -26,7 +26,7 @@ export function PanelNav({ slug, queue, integrations }: { slug: string; queue: n
             href={t.href}
             onClick={() => t.href !== pathname && setTapped({ href: t.href, from: pathname })}
             aria-current={pathname === t.href ? "page" : undefined}
-            className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-sm transition active:scale-95 sm:py-1.5 ${active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"}`}
+            className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition active:scale-95 sm:py-1.5 ${active ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"}`}
           >
             {t.label}
             {t.badge ? (
@@ -42,7 +42,7 @@ export function PanelNav({ slug, queue, integrations }: { slug: string; queue: n
       })}
       {integrations && (
         <form action={integrations}>
-          <button className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-sm text-zinc-700 transition hover:bg-zinc-100 active:scale-95 sm:py-1.5">
+          <button className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 active:scale-95 sm:py-1.5">
             Integrações
           </button>
         </form>

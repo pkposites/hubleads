@@ -24,7 +24,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
   const columns = resolveColumns(sheet.columns, sheet.answers);
 
   return (
-    <PanelProvider value={{ slug, company: workspace.name, templates, isAdmin: asAdmin, columns, answers: sheet.answers, stages: sheet.stages ?? [], meta: sheet.meta ?? { schedule: false, purchase: false } }}>
+    <PanelProvider value={{ slug, company: workspace.name, templates, isAdmin: asAdmin, columns, answers: sheet.answers, stages: sheet.stages ?? [], hiddenMetrics: sheet.hidden_metrics ?? [], meta: sheet.meta ?? { schedule: false, purchase: false } }}>
       <div className="flex flex-1 flex-col">
         <AutoRefresh />
         <NewLeadAlert latest={counts.latest} />
@@ -36,7 +36,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
             </Link>
           </div>
         )}
-        <header className="border-b border-zinc-200 bg-white">
+        <header className="sticky top-0 z-20 border-b border-zinc-200/80 bg-white/90 backdrop-blur">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2 sm:px-4 sm:py-3">
             <div className="flex min-w-0 items-center gap-2">
               <span className="font-semibold">Cadê o Lead</span>
