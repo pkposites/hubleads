@@ -11,6 +11,7 @@ import { PanelProvider } from "./panel-context";
 import { PanelNav } from "./panel-nav";
 import { PushToggle } from "./push-toggle";
 import { RefreshButton } from "./refresh-button";
+import { ThemeToggle, themeScript } from "./theme-toggle";
 
 export default async function PanelLayout({ children, params }: LayoutProps<"/w/[slug]">) {
   const { slug } = await params;
@@ -25,7 +26,8 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
 
   return (
     <PanelProvider value={{ slug, company: workspace.name, templates, isAdmin: asAdmin, columns, answers: sheet.answers, stages: sheet.stages ?? [], hiddenMetrics: sheet.hidden_metrics ?? [], meta: sheet.meta ?? { schedule: false, purchase: false } }}>
-      <div className="flex flex-1 flex-col">
+      <div className="lh-panel flex flex-1 flex-col">
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <AutoRefresh />
         <NewLeadAlert latest={counts.latest} />
         {asAdmin && (
@@ -44,6 +46,7 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
               <span className="truncate text-sm font-medium">{workspace.name}</span>
             </div>
             <div className="ml-auto flex items-center gap-1 sm:order-last">
+              <ThemeToggle />
               <RefreshButton />
               <PushToggle vapidKey={vapidPublicKey()} />
               <form action={logout.bind(null, slug)}>

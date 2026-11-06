@@ -7,9 +7,9 @@ import { formatRate, rate } from "@/lib/leads";
 // visitors per day as columns, conversion rate per day as a line.
 
 const SERIES = "#2a78d6";
-const GRID = "#e1e0d9";
-const BASELINE = "#c3c2b7";
-const MUTED = "#898781";
+const GRID = "var(--color-zinc-200)";
+const BASELINE = "var(--color-zinc-300)";
+const MUTED = "var(--color-zinc-500)";
 const HEIGHT = 180;
 const PAD = { top: 16, right: 12, bottom: 24, left: 36 };
 
@@ -169,7 +169,7 @@ function Chart({
                   ))}
                   {values.map((v, i) =>
                     v === null || (days.length > 14 && active !== i && i !== days.length - 1) ? null : (
-                      <circle key={i} cx={cx(i)} cy={y(v)} r={4} fill={SERIES} stroke="#ffffff" strokeWidth={2} />
+                      <circle key={i} cx={cx(i)} cy={y(v)} r={4} fill={SERIES} stroke="var(--color-white)" strokeWidth={2} />
                     ),
                   )}
                 </>

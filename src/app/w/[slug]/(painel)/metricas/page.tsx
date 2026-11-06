@@ -37,7 +37,7 @@ const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v
 /** Meter: accent fill on a lighter step of the same hue. */
 function Meter({ value, label }: { value: number | null; label: string }) {
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-[#cde2fb]" role="meter" aria-label={label} aria-valuenow={value ?? 0} aria-valuemin={0} aria-valuemax={100}>
+    <div className="h-2 w-full overflow-hidden rounded-full bg-sky-100" role="meter" aria-label={label} aria-valuenow={value ?? 0} aria-valuemin={0} aria-valuemax={100}>
       <div className="h-full rounded-full bg-[#2a78d6]" style={{ width: `${value ?? 0}%` }} />
     </div>
   );
@@ -94,7 +94,8 @@ export default async function MetricsPage({ params, searchParams }: PageProps<"/
     { label: "Agendaram", value: t.scheduled },
     { label: "Compraram", value: t.sales, hint: t.sales ? formatMoney(t.revenue) : undefined },
   ];
-  const top = Math.max(t.visitors, 1);
+  // The widest step sets the scale (clicks can outnumber visits when visits were not counted).
+  const top = Math.max(...funnel.map((f) => f.value), 1);
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-5">

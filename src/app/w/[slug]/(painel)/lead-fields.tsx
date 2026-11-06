@@ -627,7 +627,7 @@ export function EventChips({ events, max = 4 }: { events?: string[]; max?: numbe
   return (
     <div className="flex flex-wrap gap-1" aria-label="Eventos na landing page">
       {shown.map((e) => (
-        <span key={e} className="rounded-full bg-[#2a78d6]/10 px-2 py-0.5 text-xs font-medium text-[#1d5aa3]">
+        <span key={e} className="rounded-full bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-800">
           {eventLabel(e)}
         </span>
       ))}

@@ -90,7 +90,7 @@ export default async function SheetPage({ params, searchParams }: PageProps<"/w/
       {shown > 0 && <div className={`grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 ${columns}`}>
         {!hidden.has("conversion") && <Link
           href={`/w/${slug}/metricas?${new URLSearchParams(period.query)}`}
-          className="col-span-2 rounded-2xl border border-[#2a78d6]/25 bg-[#2a78d6]/5 px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] hover:bg-[#2a78d6]/10 sm:px-4 md:col-span-1"
+          className="col-span-2 rounded-2xl border border-sky-600/25 bg-sky-600/5 px-3.5 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)] hover:bg-sky-600/10 sm:px-4 md:col-span-1"
         >
           <div className="text-xs font-medium text-zinc-600">Conversão da LP</div>
           <div className="mt-0.5 text-xl font-semibold tracking-tight sm:text-2xl">{formatRate(rate(stats.clicks, stats.visitors))}</div>
