@@ -221,6 +221,12 @@
     event.url = window.location.href.split("#")[0];
     event.title = document.title;
     if (tracking) {
+      // The Meta pixel writes _fbp (and _fbc) after it loads, usually after
+      // this script read them: look again when something is sent.
+      var fbp = cookie("_fbp");
+      if (fbp) attribution.fbp = fbp;
+      var fbc = cookie("_fbc");
+      if (fbc) attribution.fbc = fbc;
       event.attribution = attribution;
       event.url_params = urlParams;
     }

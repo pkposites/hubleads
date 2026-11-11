@@ -104,6 +104,19 @@ describe("tracker.js", () => {
     expect(String(sent[0].visitor_id)).toMatch(/^[a-z0-9]{20}$/);
   });
 
+  it("picks up the Meta pixel cookie written after the page loaded", async () => {
+    document.cookie = "_fbp=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    const { sent, flush } = load("/lp?fbclid=IwAR9z");
+    await flush();
+    expect(sent[0].attribution.fbp).toBeUndefined();
+    document.cookie = "_fbp=fb.1.1727180000.555";
+    whatsappLink("https://wa.me/5511999999999").click();
+    await flush();
+    const click = sent.find((e) => e.type === "whatsapp_click")!;
+    expect(click.attribution).toMatchObject({ fbp: "fb.1.1727180000.555" });
+    expect(click.attribution.fbc).toMatch(/^fb\.1\.\d+\.IwAR9z$/);
+  });
+
   it("keeps the campaign when the visitor comes back without UTMs", async () => {
     load("/?utm_source=google&utm_medium=cpc&gclid=abc");
     const { sent, flush } = load("/outra-pagina");
