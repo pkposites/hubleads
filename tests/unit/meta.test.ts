@@ -40,9 +40,9 @@ describe("Meta conversions", () => {
       event_name: "Schedule",
       event_id: "lead-1.Schedule",
       event_time: now.getTime() / 1000,
-      action_source: "chat",
+      action_source: "website",
+      event_source_url: "https://clinica.com.br/lp",
     });
-    expect(event).not.toHaveProperty("event_source_url");
     expect(event.user_data).toEqual({
       country: [sha256("br")],
       ph: [sha256("5511912345678")],
@@ -88,7 +88,7 @@ describe("Meta conversions", () => {
 
     const booked = dueEvents(lead({ tracking_consent: false, created_at: "2026-10-03T11:00:00Z" }), minimalConfig, ["Lead"], now);
     expect(booked).toHaveLength(1);
-    expect(booked[0]).toMatchObject({ event_name: "Schedule", action_source: "chat" });
+    expect(booked[0]).toMatchObject({ event_name: "Schedule", action_source: "website", event_source_url: "https://clinica.com.br/lp" });
     expect(Object.keys(booked[0].user_data).sort()).toEqual(["client_ip_address", "client_user_agent", "fbc"]);
     // Visitors who accepted: the page's pixel sends the Lead, not Lead Hub.
     expect(dueEvents(lead({ tracking_consent: true, status: "novo", created_at: "2026-10-03T11:00:00Z" }), minimalConfig, [], now)).toEqual([]);
@@ -103,10 +103,23 @@ describe("Meta conversions", () => {
     expect(dueEvents(lead(), config, [], now, "2026-09-25T12:00:30Z")[0].event_time).toBe(now.getTime() / 1000);
   });
 
-  it("reports conversions as happening in the conversation, keeping the click ids", () => {
+  it("reports conversions of leads without a page as happening in the conversation, keeping the click ids", () => {
     const [event] = dueEvents(lead({ user_agent: null, landing_url: null }), config, []);
     expect(event.action_source).toBe("chat");
+    expect(event).not.toHaveProperty("event_source_url");
     expect(event.user_data).toMatchObject({ fbc: "fb.1.1.IwAR", fbp: "fb.1.1.99" });
+  });
+
+  it("reports booking and sale of a landing page lead as website events, so website campaigns get the credit", () => {
+    const [event] = dueEvents(lead({ status: "venda", sale_value: 900 }), config, []);
+    expect(event).toMatchObject({ event_name: "Purchase", action_source: "website", event_source_url: "https://clinica.com.br/lp" });
+  });
+
+  it("sends nothing for visitors without cookies who did not come from an ad click", () => {
+    const now = new Date("2026-10-03T12:00:00Z");
+    const minimalConfig = { ...config, minimal_tracking: true };
+    expect(dueEvents(lead({ tracking_consent: false, fbc: null, created_at: "2026-10-03T11:00:00Z" }), minimalConfig, [], now)).toEqual([]);
+    expect(dueEvents(lead({ tracking_consent: false, fbc: null, status: "venda", sale_value: 900 }), minimalConfig, ["Lead"], now)).toEqual([]);
   });
 
   it("posts to the Graph API with the test code and hides the token in the response", async () => {

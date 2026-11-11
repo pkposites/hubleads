@@ -142,6 +142,9 @@ export function dueEvents(
   const wanted: { name: string; custom?: Record<string, unknown>; time?: Date }[] = [];
   const crm = isFormLead(lead);
   // Their Lead too: the page's pixel stayed off, so Meta never saw the click.
+  // Without the ad click id they would reach Meta with only IP and browser:
+  // nothing to tie them to an ad, and Meta flags them as missing customer data.
+  if (minimal && !crm && !lead.fbc) return events;
   const minimalLead = minimal && !crm && Boolean(lead.ip_address && lead.user_agent);
   if ((crm || minimalLead) && !sent.includes("Lead") && lead.created_at) {
     // The stage the lead enters with; Meta needs it to learn the funnel.
@@ -152,6 +155,7 @@ export function dueEvents(
   if (!statusTooOld && lead.status === "venda" && config.send_purchase && value !== null && value > 0) {
     wanted.push({ name: META_EVENTS.venda, custom: { currency: "BRL", value } });
   }
+  const website = /^https?:\/\//.test(lead.landing_url ?? "");
   for (const w of wanted) {
     if (sent.includes(w.name)) continue;
     const time = Math.floor(Math.min((w.time ?? at).getTime(), now.getTime()) / 1000);
@@ -167,30 +171,18 @@ export function dueEvents(
       });
       continue;
     }
-    if (minimal) {
-      const user = minimalUserData(lead);
-      if (Object.keys(user).length === 0) continue;
-      const website = w.name === "Lead" && /^https?:\/\//.test(lead.landing_url ?? "");
-      events.push({
-        event_name: w.name,
-        event_time: time,
-        event_id: `${lead.id}.${w.name}`,
-        // The click happened on the page; booking and sale in the conversation.
-        action_source: website ? "website" : "chat",
-        ...(website && { event_source_url: lead.landing_url! }),
-        user_data: user,
-        ...(w.custom && { custom_data: w.custom }),
-      });
-      continue;
-    }
+    const user = minimal ? minimalUserData(lead) : userData(lead);
+    if (Object.keys(user).length === 0) continue;
     events.push({
       event_name: w.name,
       event_time: time,
       event_id: `${lead.id}.${w.name}`,
-      // The booking and the sale happen in the WhatsApp conversation, not on
-      // the site; the click ids (fbc/fbp) still link them to the ad.
-      action_source: "chat",
-      user_data: userData(lead),
+      // A lead that came through the landing page is a website conversion,
+      // booking and sale included: Ads Manager credits website campaigns
+      // ("Compras no site") only with website events. Without a page address
+      // (typed in by hand) the conversion happened in the conversation.
+      ...(website ? { action_source: "website", event_source_url: lead.landing_url! } : { action_source: "chat" }),
+      user_data: user,
       ...(w.custom && { custom_data: w.custom }),
     });
   }

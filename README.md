@@ -162,10 +162,13 @@ os 4 últimos caracteres. Com o envio ligado:
 
 Cada evento vai uma vez por lead (`event_id` = lead + evento), com telefone e
 nome em SHA-256, `fbc`, `fbp`, IP e navegador do clique, no horário em que o
-lead foi agendado ou vendido e como conversão feita na conversa
-(`action_source: chat`). Quem não aceitou os cookies na LP vai só com a medição
-sem cookies (o `Lead` do clique também, já que o pixel da LP ficou parado):
-`fbc` do endereço, IP e navegador, sem telefone nem nome.
+lead foi agendado ou vendido. Lead que veio da LP vai como conversão do site
+(`action_source: website`, com o endereço da LP), porque o Gerenciador de
+Anúncios só credita campanhas de site com eventos do site; lead sem LP (digitado
+à mão) vai como conversão na conversa (`action_source: chat`). Quem não aceitou
+os cookies na LP vai só com a medição sem cookies (o `Lead` do clique também, já
+que o pixel da LP ficou parado): `fbc` do endereço, IP e navegador, sem telefone
+nem nome; sem `fbc` (não veio de anúncio) não vai nada, nem o `PageView`.
 
 Se um envio falhar, a função agendada `netlify/functions/meta-retry.mts` tenta
 de novo a cada hora (até 6 vezes por evento, enquanto o resultado tiver menos

@@ -288,6 +288,9 @@ async function handleMetaView(
   const ip = clientIp(request);
   if (!deps.metaView || !ip || !userAgent || BOT_RE.test(userAgent)) return json(200, { ok: true, ignored: true });
   const clean = minimalAttribution(minimal);
+  // Without the ad click id Meta gets only IP and browser: it cannot tie the
+  // view to an ad and flags the event as missing customer data.
+  if (!clean.fbc) return json(200, { ok: true, ignored: true });
   try {
     const result = await deps.metaView(key, originHost(request), { fbc: clean.fbc, url: clean.landing_url, ip, userAgent: userAgent.slice(0, 500) }, deps.clientKey(ip));
     if (result?.limited === true) {

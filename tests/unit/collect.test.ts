@@ -63,6 +63,13 @@ describe("page views without cookies", () => {
     expect(JSON.stringify(d.logs)).not.toContain("IwAR1");
   });
 
+  it("skips views without an ad click id (Meta would get only IP and browser)", async () => {
+    const metaView = vi.fn<NonNullable<CollectDeps["metaView"]>>(async () => ({ sent: true }));
+    const response = await handleCollect(post({ ...view, minimal: { landing_url: "https://clinica.com.br/lp" } }, { "X-Real-IP": "200.1.2.3" }), deps({ metaView }));
+    expect(response.status).toBe(200);
+    expect(metaView).not.toHaveBeenCalled();
+  });
+
   it("ignores bots and answers 429 over the limit", async () => {
     const metaView = vi.fn<NonNullable<CollectDeps["metaView"]>>(async () => ({ limited: true }));
     const bot = deps({ metaView });
