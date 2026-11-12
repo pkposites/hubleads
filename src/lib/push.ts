@@ -59,3 +59,26 @@ export async function notifyNewLead(leadId: string) {
     console.log(JSON.stringify({ ts: new Date().toISOString(), job: "push", error: (error as { code?: string }).code ?? "unknown" }));
   }
 }
+
+/**
+ * A test notice to the device that asked for it (its own subscription), so
+ * the person can see right away whether notices reach this device.
+ */
+export async function sendTestPush(
+  subscription: { endpoint?: string; keys?: { p256dh?: string; auth?: string } },
+  url: string,
+): Promise<{ ok: boolean }> {
+  const config = configured();
+  const { endpoint, keys } = subscription;
+  if (!config || !endpoint || !/^https:\/\//.test(endpoint) || !keys?.p256dh || !keys.auth) return { ok: false };
+  try {
+    await webpush.sendNotification(
+      { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } },
+      JSON.stringify({ title: "Cadê o Lead · teste", body: "Os avisos de novo lead chegam neste aparelho.", url, tag: "lh-test" }),
+      { vapidDetails: config.vapid, TTL: 60, urgency: "high" },
+    );
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}

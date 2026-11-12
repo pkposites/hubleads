@@ -58,6 +58,30 @@ describe("new-lead notifications on the admins' devices", () => {
     expect(push.targets.filter((t) => [m, g].includes(t.endpoint)).every((t) => t.kind === "admin")).toBe(true);
   });
 
+  it("people given access to the client are notified too; the client's team account is not", async () => {
+    const added = await anon<{ id: string; login: string; password: string }>(pool, "select lh_admin_add_member($1, $2, $3) as r", [
+      gestor.token,
+      gestorClient.id,
+      `conta-${randomUUID().slice(0, 8)}@example.com`,
+    ]);
+    const person = (await anon<{ token: string }>(pool, "select lh_admin_login($1, $2) as r", [added.login, added.password])).token;
+    const p = device();
+    await subscribe(person, p);
+    const elsewhere = await newGestor();
+    const e = device();
+    await subscribe(elsewhere.token, e);
+    // The client's team opens "Integrações" (its account is a member of the client).
+    await anon(pool, "select lh_admin_set_team_access($1, $2, true) as r", [gestor.token, gestorClient.id]);
+    const sheet = await anon<{ token: string }>(pool, "select lh_admin_open_workspace($1, $2) as r", [gestor.token, gestorClient.id]);
+    const team = await anon<{ token: string }>(pool, "select lh_session_open_integrations($1) as r", [sheet.token]);
+    const t = device();
+    await subscribe(team.token, t);
+    const endpoints = (await pushFor(gestorClient.key)).targets.map((x) => x.endpoint);
+    expect(endpoints).toContain(p);
+    expect(endpoints).not.toContain(e);
+    expect(endpoints).not.toContain(t);
+  });
+
   it("a device linked to the client and to the admin gets one notice", async () => {
     const both = device();
     await subscribe(gestor.token, both);

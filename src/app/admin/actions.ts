@@ -13,6 +13,7 @@ import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { explainGraphError, listForms, listPages } from "@/lib/meta-leads";
 import { syncMetaForms } from "@/lib/meta-lead-sync";
 import { mailReady, publicAppUrl, resetPasswordEmail, sendMail } from "@/lib/mail";
+import { sendTestPush } from "@/lib/push";
 import { encryptionKey, lockedMessage, loginClient, serverSecret } from "@/lib/server";
 import { call, DbError } from "@/lib/db";
 import { normalizeDomain } from "@/lib/domains";
@@ -69,6 +70,12 @@ export async function adminPushSubscribe(subscription: { endpoint?: string; keys
   } catch {
     return { error: "Não foi possível ativar os avisos." };
   }
+}
+
+/** A test notice to this device. */
+export async function adminPushTest(subscription: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }) {
+  await requireAdmin();
+  return sendTestPush(subscription, "/admin");
 }
 
 export async function adminPushUnsubscribe(endpoint: string) {

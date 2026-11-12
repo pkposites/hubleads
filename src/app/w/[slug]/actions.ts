@@ -10,6 +10,7 @@ import { fromLocalInput } from "@/lib/format";
 import type { LpEvent } from "@/lib/lp-events";
 import { isColor, isStatus, parseMoney, type HistoryEntry, type Lead, type Status, type Template } from "@/lib/leads";
 import { normalizePhone } from "@/lib/normalize";
+import { sendTestPush } from "@/lib/push";
 import { METRICS, type SheetColumn } from "@/lib/sheet-columns";
 import { loginClient, lockedMessage } from "@/lib/server";
 import { requireWorkspace, SESSION_COOKIE } from "@/lib/session";
@@ -319,6 +320,12 @@ export async function pushSubscribe(
   } catch {
     return { error: "Não foi possível ativar os avisos." };
   }
+}
+
+/** A test notice to this device. */
+export async function pushTest(slug: string, subscription: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }) {
+  await requireWorkspace(slug);
+  return sendTestPush(subscription, `/w/${slug}`);
 }
 
 export async function pushUnsubscribe(slug: string, endpoint: string) {

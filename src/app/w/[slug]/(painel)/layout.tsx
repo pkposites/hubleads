@@ -48,7 +48,8 @@ export default async function PanelLayout({ children, params }: LayoutProps<"/w/
             <div className="ml-auto flex items-center gap-1 sm:order-last">
               <ThemeToggle />
               <RefreshButton />
-              <PushToggle vapidKey={vapidPublicKey()} />
+              {/* Admins get notices from the painel mãe bell; here it would tie their device to this client. */}
+              {!asAdmin && <PushToggle vapidKey={vapidPublicKey()} />}
               <form action={logout.bind(null, slug)}>
                 <button className="px-2 py-1.5 text-sm text-zinc-600 hover:underline">Sair</button>
               </form>

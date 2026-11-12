@@ -20,18 +20,22 @@ export function PushButton({
   vapidKey,
   subscribe,
   unsubscribe,
+  test,
   description,
   dark = false,
 }: {
   vapidKey: string | null;
   subscribe: (subscription: Keys) => Promise<{ error?: string }>;
   unsubscribe: (endpoint: string) => Promise<unknown>;
+  /** Sends a test notice to this device. */
+  test: (subscription: Keys) => Promise<{ ok: boolean }>;
   description: string;
   dark?: boolean;
 }) {
   const [state, setState] = useState<State>("loading");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tested, setTested] = useState<"sending" | "sent" | "failed" | null>(null);
 
   useEffect(() => {
     const check = async () => {
@@ -68,6 +72,20 @@ export function PushButton({
       setOpen(false);
     } catch {
       setError("Não foi possível ativar os avisos neste aparelho.");
+    }
+  };
+
+  const sendTest = async () => {
+    setTested("sending");
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (!subscription) return setState("off");
+      // Re-links this device too, in case the server lost it.
+      await subscribe(subscription.toJSON() as Keys);
+      setTested((await test(subscription.toJSON() as Keys)).ok ? "sent" : "failed");
+    } catch {
+      setTested("failed");
     }
   };
 
@@ -108,6 +126,23 @@ export function PushButton({
             {state === "on" && (
               <>
                 <p>Avisos ativos neste aparelho. {description}</p>
+                <button
+                  type="button"
+                  onClick={sendTest}
+                  disabled={tested === "sending"}
+                  className="min-h-11 self-start rounded-md border border-zinc-300 px-4 py-2 font-medium disabled:opacity-60"
+                >
+                  {tested === "sending" ? "Enviando…" : "Enviar aviso de teste"}
+                </button>
+                {tested === "sent" && (
+                  <p className="text-zinc-700">
+                    Enviado. Se não aparecer em alguns segundos, confira se as notificações do Cadê o Lead estão permitidas nos
+                    ajustes do aparelho e se o modo Foco ou Não perturbe está desligado.
+                  </p>
+                )}
+                {tested === "failed" && (
+                  <p className="text-red-700">Este aparelho não aceitou o aviso. Toque em &quot;Desativar neste aparelho&quot; e ative de novo.</p>
+                )}
                 <button type="button" onClick={disable} className="self-start text-red-700 hover:underline">
                   Desativar neste aparelho
                 </button>

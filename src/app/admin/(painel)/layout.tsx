@@ -41,7 +41,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
               </span>
             </Link>
             <div className="flex items-center gap-2 md:hidden">
-              {role !== "conta" && <AdminPush vapidKey={vapidPublicKey()} master={role === "master"} />}
+              <AdminPush vapidKey={vapidPublicKey()} role={role} />
               <Link
                 href="/admin/conta"
                 title={`${login} (${role})`}
@@ -53,7 +53,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
           </div>
           <NavTabs role={role} />
           <div className="ml-auto hidden items-center gap-3 text-sm text-zinc-300 md:flex">
-            {role !== "conta" && <AdminPush vapidKey={vapidPublicKey()} master={role === "master"} />}
+            <AdminPush vapidKey={vapidPublicKey()} role={role} />
             <Link href="/admin/conta" className="flex items-center gap-2 hover:text-white" title="Minha conta">
               <span className="grid size-7 place-items-center rounded-full bg-zinc-700 text-xs font-medium text-white">{initial}</span>
               <span className="max-w-48 truncate">{login}</span>
