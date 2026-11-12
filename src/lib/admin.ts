@@ -89,7 +89,7 @@ export function installPrompt(origin: string, page: Pick<Page, "public_key">) {
 
 ${snippet(origin, page)}
 
-   O data-consent="banner" mostra um aviso curto de cookies (Aceitar / Recusar cookies). Sem aceite, nada fica guardado no aparelho da pessoa; a visita e o clique no WhatsApp ainda contam para a Meta pelo servidor do Cadê o Lead, sem cookies (medição mínima, ligada no cadastro do cliente). Não crie nenhum envio próprio para isso na LP.
+   O data-consent="banner" mostra um aviso curto de cookies (Aceitar / Recusar cookies). Sem aceite, nada fica guardado no aparelho da pessoa; se ela veio de um anúncio da Meta, a visita e o clique no WhatsApp ainda contam para a Meta pelo servidor do Cadê o Lead, sem cookies (medição mínima, ligada no cadastro do cliente). Não crie nenhum envio próprio para isso na LP.
    Se a página já tiver um banner de cookies próprio, troque por data-consent="required" e chame window.LeadHub?.consent(true) ao aceitar e window.LeadHub?.consent(false) ao recusar (não mostre os dois banners).
 
 2. LGPD no pixel da Meta e no Google: para que também só rodem depois do aceite, no código do pixel coloque fbq('consent', 'revoke'); ANTES de fbq('init', ...). Se houver Google Tag Manager/gtag, antes dele: gtag('consent', 'default', { ad_storage: 'denied', analytics_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });. O Cadê o Lead libera os dois quando a pessoa aceita. Não mude mais nada no pixel.
@@ -105,6 +105,9 @@ ${snippet(origin, page)}
    e abra o WhatsApp passando a URL pelo Cadê o Lead:
      const destino = window.LeadHub ? window.LeadHub.whatsappUrl(url) : url;
    Use "destino" no lugar da URL original, do jeito que a página já abre hoje (link, window.open ou location.href).
+
+   Se a página tiver um formulário (sem abrir o WhatsApp), ao enviar com sucesso chame:
+     window.LeadHub?.submit({ name: nome, phone: telefone, email: email });
 
 5. Se a página tiver quiz ou perguntas, envie as respostas antes de abrir o WhatsApp:
      window.LeadHub?.set({ "Pergunta curta": "resposta escolhida" });
