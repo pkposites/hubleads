@@ -72,6 +72,22 @@ export async function adminPushSubscribe(subscription: { endpoint?: string; keys
   }
 }
 
+/** Allows an address refused for the page (adds it to the page's domains). */
+export async function allowOrigin(workspaceId: string, pageId: string, host: string) {
+  const { token } = await requireAdmin();
+  await call("lh_admin_allow_origin", { p_token: token, p_page_id: pageId, p_host: host });
+  revalidatePath("/admin");
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+}
+
+/** Hides the alert of an address that is not the client's. */
+export async function dismissOrigin(workspaceId: string, pageId: string, host: string) {
+  const { token } = await requireAdmin();
+  await call("lh_admin_dismiss_origin", { p_token: token, p_page_id: pageId, p_host: host });
+  revalidatePath("/admin");
+  revalidatePath(`/admin/clientes/${workspaceId}`);
+}
+
 /** A test notice to this device. */
 export async function adminPushTest(subscription: { endpoint?: string; keys?: { p256dh?: string; auth?: string } }) {
   await requireAdmin();

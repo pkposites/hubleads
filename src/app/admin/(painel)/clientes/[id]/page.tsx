@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OriginAlerts, type OriginAlert } from "../../origin-alerts";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
@@ -115,7 +116,7 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
       if (error instanceof DbError && (error.code === "LH404" || error.code === "22P02")) return null;
       throw error;
     });
-  const [client, eventList, meta, pixelList, privacy, leadForms, sourceList, googleAds, admins, memberList, teamAccess, origin] = await Promise.all([
+  const [client, eventList, meta, pixelList, privacy, leadForms, sourceList, googleAds, admins, memberList, teamAccess, origin, originAlerts] = await Promise.all([
     found(call<ClientSummary>("lh_admin_workspace", args)),
     found(call<LeadEvent[]>("lh_admin_list_events", { ...args, p_limit: 50 })),
     found(call<MetaSettingsData>("lh_admin_get_meta", args)),
@@ -128,6 +129,7 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
     manages ? found(call<Member[]>("lh_admin_list_members", args)) : Promise.resolve([] as Member[]),
     manages ? found(call<boolean>("lh_admin_get_team_access", args)) : Promise.resolve(false),
     appOrigin(),
+    call<OriginAlert[]>("lh_admin_origin_alerts", { p_token: token }).catch(() => [] as OriginAlert[]),
   ]);
   if (!client || !meta || !privacy || !leadForms) notFound();
   const events = eventList ?? [];
@@ -179,6 +181,8 @@ export default async function ClientPage({ params, searchParams }: PageProps<"/a
           </form>
         )}
       </div>
+
+      <OriginAlerts alerts={originAlerts.filter((a) => a.workspace_id === client.id)} showClient={false} />
 
       <nav className="-mx-4 flex gap-1 overflow-x-auto border-b border-zinc-200 px-4 [scrollbar-width:none] md:mx-0 md:px-0" aria-label="Seções do cliente">
         {tabs.map((t) => (

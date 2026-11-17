@@ -315,3 +315,28 @@ describe("data for Meta's Conversions API", () => {
     expect(clientIp(new Request("https://x.test", { headers }))).toBe(expected);
   });
 });
+
+describe("sends from an address that is not among the page's domains", () => {
+  const refused = () => Object.assign(new Error("origin not allowed"), { code: "LH403" });
+
+  it("answers 403 and records the address, telling whether a contact was lost", async () => {
+    const noteRefused = vi.fn<NonNullable<CollectDeps["noteRefused"]>>();
+    const d = deps({ collect: vi.fn(async () => Promise.reject(refused())), noteRefused });
+    const click = await handleCollect(post({ key: "pk_ok", type: "whatsapp_click", visitor_id: "visitor-1" }, { Origin: "https://novosite.com.br" }), d);
+    expect(click.status).toBe(403);
+    expect(noteRefused).toHaveBeenLastCalledWith("pk_ok", "novosite.com.br", true);
+    await handleCollect(post({ key: "pk_ok", type: "page_view", visitor_id: "visitor-1" }, { Origin: "https://novosite.com.br" }), d);
+    expect(noteRefused).toHaveBeenLastCalledWith("pk_ok", "novosite.com.br", false);
+  });
+
+  it("records refused visits too, and nothing for other errors", async () => {
+    const noteRefused = vi.fn<NonNullable<CollectDeps["noteRefused"]>>();
+    const visit = { key: "pk_ok", type: "visit", visitor_id: "anonymous", attribution: {} };
+    const d = deps({ countVisit: vi.fn(async () => Promise.reject(refused())), noteRefused });
+    expect((await handleCollect(post(visit, { "X-Real-IP": "200.1.2.3", Origin: "https://novosite.com.br" }), d)).status).toBe(403);
+    expect(noteRefused).toHaveBeenCalledWith("pk_ok", "novosite.com.br", false);
+    const other = deps({ collect: vi.fn(async () => Promise.reject(Object.assign(new Error("x"), { code: "LH401" }))), noteRefused: vi.fn() });
+    await handleCollect(post({ key: "pk_ok", type: "whatsapp_click", visitor_id: "visitor-1" }), other);
+    expect(other.noteRefused).not.toHaveBeenCalled();
+  });
+});

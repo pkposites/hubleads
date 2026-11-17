@@ -117,6 +117,12 @@ export interface CollectDeps {
   ): Promise<{ sent?: boolean; limited?: boolean } | null>;
   /** Keyed hash of the visitor's IP; the IP itself is never sent to the database. */
   clientKey(ip: string | undefined): string;
+  /**
+   * A send was refused because the site's address is not among the page's
+   * domains: records it (after the response) so the panel can warn. lead: a
+   * WhatsApp click or a form, i.e. a contact lost.
+   */
+  noteRefused?(key: string, originHost: string, lead: boolean): void;
 }
 
 export interface VisitDims {
@@ -272,6 +278,7 @@ export async function handleCollect(request: Request, deps: CollectDeps): Promis
     const code = (error as { code?: string } | null)?.code;
     const status = code === "LH401" ? 401 : code === "LH403" ? 403 : code === "22023" ? 400 : 500;
     deps.log({ route: "POST /api/collect", type: event.type, status, error_code: code ?? "unknown" });
+    if (code === "LH403" && host) deps.noteRefused?.(event.key, host, event.type === "whatsapp_click" || event.type === "form_submit");
     return json(status, { error: status === 500 ? "internal error" : code });
   }
 }
@@ -334,6 +341,8 @@ async function handleVisit(
     const code = (error as { code?: string } | null)?.code;
     const status = code === "LH401" ? 401 : code === "LH403" ? 403 : code === "22023" ? 400 : 500;
     deps.log({ route: "POST /api/collect", type: "visit", status, error_code: code ?? "unknown" });
+    const host = originHost(request);
+    if (code === "LH403" && host) deps.noteRefused?.(key, host, false);
     return json(status, { error: status === 500 ? "internal error" : code });
   }
 }

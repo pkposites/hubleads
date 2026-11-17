@@ -30,6 +30,10 @@ const deps: CollectDeps = {
   pageConfig: (key) => call("lh_page_config", { p_key: key }),
   log: (entry) => console.log(JSON.stringify({ ts: new Date().toISOString(), ...entry })),
   metaView: (key, originHost, view, client) => sendMinimalView(key, originHost, view, client),
+  noteRefused: (key, originHost, lead) =>
+    after(async () => {
+      await call("lh_server_note_refused_origin", { p_secret: secret(), p_key: key, p_host: originHost, p_lead: lead }).catch(() => undefined);
+    }),
   onNewLead: (leadId, info) =>
     after(async () => {
       // Visitors without cookies: the page's pixel stayed off, so the Lead goes from here.
