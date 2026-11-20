@@ -85,6 +85,19 @@ describe("integrations opened from the sheet (team account)", () => {
     await expect(open(client.token)).rejects.toMatchObject({ code: "LH403" });
   });
 
+  it("the team account never gets a password nor is removed as a person", async () => {
+    const id = (await pool.query("select id from lh_admins where team_workspace_id = $1", [client.workspaceId])).rows[0].id;
+    const members = () => pool.query("select count(*)::int n from lh_workspace_members where admin_id = $1", [id]).then((r) => r.rows[0].n);
+    const before = await members();
+    await expect(
+      anon(pool, "select lh_admin_reset_member_password($1, $2, $3) as r", [master.token, client.workspaceId, id]),
+    ).rejects.toMatchObject({ code: "LH404" });
+    await expect(anon(pool, "select lh_admin_remove_member($1, $2, $3) as r", [master.token, client.workspaceId, id])).rejects.toMatchObject({
+      code: "LH404",
+    });
+    expect(await members()).toBe(before);
+  });
+
   it("nobody logs in as the team account", async () => {
     const { rows } = await pool.query("select login from lh_admins where team_workspace_id = $1", [client.workspaceId]);
     expect(rows).toHaveLength(1);
